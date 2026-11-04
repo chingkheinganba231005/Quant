@@ -19,7 +19,7 @@ The three libraries every data scientist and quant uses daily, from the first li
 | # | Chapter | What you learn |
 |---|---|---|
 | T1 | [NumPy from Zero](toolkit/01-numpy-from-zero/) | Arrays and dtypes, slicing and the view trap, vectorisation, axes, broadcasting, linear algebra for portfolios (covariance, solve, PCA, Cholesky, least squares), random numbers and Monte Carlo, the bootstrap, rolling windows and einsum. |
-| T2 | pandas from Zero *(coming)* | Series and DataFrames, loc and iloc, cleaning and missing data, groupby, merge and reshape, and the time-series toolkit: dates, resampling, rolling and exponential windows, shifting without look-ahead, panel data of many stocks. |
+| T2 | [pandas from Zero](toolkit/02-pandas-from-zero/) | Series and DataFrames, loc and iloc, cleaning and missing data, groupby, merge and reshape, and the time-series toolkit: dates, resampling, rolling and exponential windows, shifting without look-ahead, panel data of many stocks. |
 | T3 | Plotting from Zero *(coming)* | Matplotlib’s figure and axes model, every common chart, dates, twin axes and annotations, publication styling, then seaborn for statistical plots and Plotly for interactive dashboards, ending with a full market report. |
 
 ## Part 2 · Financial ML and algorithmic trading

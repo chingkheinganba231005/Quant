@@ -1,0 +1,1039 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>pandas from Zero · Quant from Zero</title>
+<meta name="description" content="Tables with names and dates: loading real market data, selecting and cleaning it, reshaping it, grouping it, joining it, and the time-series tools (resampling, rolling windows, shifting) that every backtest is built from.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css">
+<link rel="stylesheet" href="../../assets/guide.css">
+<script>try{var t=localStorage.getItem('qfz-theme');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body>
+<header class="topbar">
+  <a class="brand" href="../../index.html"><span class="logo" aria-hidden="true"></span>Quant from Zero</a>
+  <span class="crumb">Toolkit · Chapter 2</span>
+  <button class="tocbtn" type="button" aria-controls="toc" aria-expanded="false">Contents</button>
+  <button class="themebtn" type="button" aria-label="Switch light or dark theme">Theme</button>
+  <span class="progress" aria-hidden="true"></span>
+</header>
+<div class="layout">
+  <nav class="toc" id="toc" aria-label="On this page">
+    <p class="toc-h">On this page</p>
+    <ol><li><a href="#setup">Setup</a></li>
+<li><a href="#series-an-array-with-an-index">Series: an array with an index</a></li>
+<li><a href="#dataframe-a-table-of-aligned-series">DataFrame: a table of aligned Series</a></li>
+<li><a href="#loading-real-data">Loading real data</a></li>
+<li><a href="#selecting-data-loc-iloc">Selecting data: [], .loc, .iloc</a></li>
+<li><a href="#from-long-to-wide-one-column-per-ticker">From long to wide: one column per ticker</a></li>
+<li><a href="#the-datetimeindex-dates-as-the-index">The DatetimeIndex: dates as the index</a></li>
+<li><a href="#missing-data">Missing data</a></li>
+<li><a href="#resampling-changing-the-frequency">Resampling: changing the frequency</a></li>
+<li><a href="#rolling-expanding-and-exponential-windows">Rolling, expanding and exponential windows</a></li>
+<li><a href="#groupby-split-apply-combine">groupby: split, apply, combine</a></li>
+<li><a href="#combining-tables-concat-merge-join-merge-asof">Combining tables: concat, merge, join, merge_asof</a></li>
+<li><a href="#performance-and-good-style">Performance and good style</a></li>
+<li><a href="#a-small-case-study-the-crash-of-march-2020">A small case study: the crash of March 2020</a></li>
+<li><a href="#the-mistakes-that-cost-quants-money">The mistakes that cost quants money</a></li>
+<li><a href="#exercises">Exercises</a></li>
+<li><a href="#whats-next">What's next</a></li></ol>
+    <p class="toc-nb"><a href="pandas_from_zero.ipynb" download>Download the notebook ↓</a></p>
+  </nav>
+  <main class="content">
+    <p class="eyebrow">Toolkit · Chapter 2</p>
+    <h1>pandas from Zero</h1>
+    <p class="lede">Tables with names and dates: loading real market data, selecting and cleaning it, reshaping it, grouping it, joining it, and the time-series tools (resampling, rolling windows, shifting) that every backtest is built from.</p>
+    <p class="meta">About 3 to 4 hours with the exercises · Toolkit 1 (NumPy)</p>
+<p>NumPy gave us fast arrays of numbers. Real data is not just numbers: it has <strong>labels</strong>. A price belongs to a ticker and a date; a return series has gaps on holidays; two data sources disagree on which days exist. pandas adds those labels to NumPy arrays and, crucially, <strong>lines data up by label automatically</strong>. That single feature removes a whole family of bugs, and it is why pandas is the standard tool for financial data.</p>
+<p>In this chapter we use real data: daily prices of ten ETFs and stocks from 2010 to October 2025 (from Yahoo Finance) and three US series from FRED (the 3-month Treasury bill rate, the 10-year Treasury yield and the VIX volatility index). Both files are in the chapter's <code>datasets/</code> folder.</p>
+<div class="box eli5">
+<p class="lab">Like you’re five</p>
+<p>A NumPy array is a grid of numbers. A pandas table is the same grid with a name on every row and every column, like a spreadsheet. When you add two pandas columns, pandas matches rows by their names (for us, the dates) before adding, the way you would match two lists of birthdays by person, not by line number.</p>
+</div>
+<h2 id="setup">Setup</h2>
+<pre class="code"><code><span class="kn">import</span><span class="w"> </span><span class="nn">sys</span>
+<span class="k">assert</span> <span class="n">sys</span><span class="o">.</span><span class="n">version_info</span> <span class="o">&gt;=</span> <span class="p">(</span><span class="mi">3</span><span class="p">,</span> <span class="mi">9</span><span class="p">)</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pd</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">"pandas"</span><span class="p">,</span> <span class="n">pd</span><span class="o">.</span><span class="n">__version__</span><span class="p">,</span> <span class="s2">"| NumPy"</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">__version__</span><span class="p">)</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">matplotlib</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">mpl</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">matplotlib.pyplot</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">plt</span>
+<span class="n">mpl</span><span class="o">.</span><span class="n">rc</span><span class="p">(</span><span class="s2">"axes"</span><span class="p">,</span> <span class="n">labelsize</span><span class="o">=</span><span class="mi">12</span><span class="p">,</span> <span class="n">titlesize</span><span class="o">=</span><span class="mi">13</span><span class="p">)</span>
+<span class="n">mpl</span><span class="o">.</span><span class="n">rc</span><span class="p">(</span><span class="s2">"figure"</span><span class="p">,</span> <span class="n">dpi</span><span class="o">=</span><span class="mi">110</span><span class="p">)</span>
+<span class="n">pd</span><span class="o">.</span><span class="n">set_option</span><span class="p">(</span><span class="s2">"display.width"</span><span class="p">,</span> <span class="mi">110</span><span class="p">)</span>
+<span class="n">pd</span><span class="o">.</span><span class="n">set_option</span><span class="p">(</span><span class="s2">"display.max_columns"</span><span class="p">,</span> <span class="mi">12</span><span class="p">)</span>
+<span class="n">pd</span><span class="o">.</span><span class="n">set_option</span><span class="p">(</span><span class="s2">"display.precision"</span><span class="p">,</span> <span class="mi">4</span><span class="p">)</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
+<span class="n">IMAGES</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="s2">"images"</span><span class="p">);</span> <span class="n">IMAGES</span><span class="o">.</span><span class="n">mkdir</span><span class="p">(</span><span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="n">DATA</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="s2">"datasets"</span><span class="p">)</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">save_fig</span><span class="p">(</span><span class="n">name</span><span class="p">):</span>
+    <span class="n">plt</span><span class="o">.</span><span class="n">tight_layout</span><span class="p">()</span>
+    <span class="n">plt</span><span class="o">.</span><span class="n">savefig</span><span class="p">(</span><span class="n">IMAGES</span> <span class="o">/</span> <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2">.png"</span><span class="p">,</span> <span class="n">dpi</span><span class="o">=</span><span class="mi">150</span><span class="p">,</span> <span class="n">bbox_inches</span><span class="o">=</span><span class="s2">"tight"</span><span class="p">)</span>
+
+<span class="n">R</span> <span class="o">=</span> <span class="p">{}</span>
+</code></pre>
+<pre class="out">pandas 3.0.5 | NumPy 2.5.3</pre>
+<div class="box note">
+<p class="lab">Note</p>
+<p>This chapter is written for pandas 2.2 or newer, including pandas 3. pandas 3 turned on <strong>copy-on-write</strong> (explained below) and a dedicated string type; the code here works the same on both.</p>
+</div>
+<h2 id="series-an-array-with-an-index">Series: an array with an index</h2>
+<p>A <code>Series</code> is a 1-D NumPy array plus an <strong>index</strong>: a label for each value.</p>
+<pre class="code"><code><span class="n">s</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span><span class="p">([</span><span class="mf">101.2</span><span class="p">,</span> <span class="mf">102.5</span><span class="p">,</span> <span class="mf">101.9</span><span class="p">],</span> <span class="n">index</span><span class="o">=</span><span class="p">[</span><span class="s2">"2025-10-01"</span><span class="p">,</span> <span class="s2">"2025-10-02"</span><span class="p">,</span> <span class="s2">"2025-10-03"</span><span class="p">],</span> <span class="n">name</span><span class="o">=</span><span class="s2">"SPY"</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">s</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">"values:"</span><span class="p">,</span> <span class="n">s</span><span class="o">.</span><span class="n">to_numpy</span><span class="p">(),</span> <span class="s2">"| index:"</span><span class="p">,</span> <span class="nb">list</span><span class="p">(</span><span class="n">s</span><span class="o">.</span><span class="n">index</span><span class="p">))</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">s</span><span class="p">[</span><span class="s2">"2025-10-02"</span><span class="p">],</span> <span class="n">s</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>      <span class="c1"># by label, by position</span>
+</code></pre>
+<pre class="out">2025-10-01    101.2
+2025-10-02    102.5
+2025-10-03    101.9
+Name: SPY, dtype: float64
+values: [101.2 102.5 101.9] | index: [&#x27;2025-10-01&#x27;, &#x27;2025-10-02&#x27;, &#x27;2025-10-03&#x27;]
+102.5 101.2</pre>
+<p>Arithmetic between two Series <strong>aligns on the index first</strong>. Labels present in only one of them give <code>NaN</code>, which tells you something did not match instead of silently pairing the wrong rows.</p>
+<pre class="code"><code><span class="n">a</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span><span class="p">([</span><span class="mf">1.0</span><span class="p">,</span> <span class="mf">2.0</span><span class="p">,</span> <span class="mf">3.0</span><span class="p">],</span> <span class="n">index</span><span class="o">=</span><span class="p">[</span><span class="s2">"Mon"</span><span class="p">,</span> <span class="s2">"Tue"</span><span class="p">,</span> <span class="s2">"Wed"</span><span class="p">])</span>
+<span class="n">b</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span><span class="p">([</span><span class="mf">10.0</span><span class="p">,</span> <span class="mf">20.0</span><span class="p">,</span> <span class="mf">30.0</span><span class="p">],</span> <span class="n">index</span><span class="o">=</span><span class="p">[</span><span class="s2">"Tue"</span><span class="p">,</span> <span class="s2">"Wed"</span><span class="p">,</span> <span class="s2">"Thu"</span><span class="p">])</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">a</span> <span class="o">+</span> <span class="n">b</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">"NumPy would pair by position:"</span><span class="p">,</span> <span class="n">a</span><span class="o">.</span><span class="n">to_numpy</span><span class="p">()</span> <span class="o">+</span> <span class="n">b</span><span class="o">.</span><span class="n">to_numpy</span><span class="p">())</span>
+</code></pre>
+<pre class="out">Mon     NaN
+Thu     NaN
+Tue    12.0
+Wed    23.0
+dtype: float64
+NumPy would pair by position: [11. 22. 33.]</pre>
+<div class="box idea">
+<p class="lab">The real idea</p>
+<p>Alignment is the reason pandas exists. Two price series from different exchanges have different holidays; a stock that listed in 2012 has no data for 2010. pandas matches them by date and marks the gaps. With raw arrays you would have to do this by hand, and an off-by-one-day error in finance means using tomorrow's price today.</p>
+</div>
+<h2 id="dataframe-a-table-of-aligned-series">DataFrame: a table of aligned Series</h2>
+<p>A <code>DataFrame</code> is a dictionary of Series sharing one index. Each column has its own dtype.</p>
+<pre class="code"><code><span class="n">df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">({</span>
+    <span class="s2">"ticker"</span><span class="p">:</span> <span class="p">[</span><span class="s2">"AAPL"</span><span class="p">,</span> <span class="s2">"MSFT"</span><span class="p">,</span> <span class="s2">"KO"</span><span class="p">],</span>
+    <span class="s2">"price"</span><span class="p">:</span> <span class="p">[</span><span class="mf">270.4</span><span class="p">,</span> <span class="mf">517.8</span><span class="p">,</span> <span class="mf">69.1</span><span class="p">],</span>
+    <span class="s2">"shares"</span><span class="p">:</span> <span class="p">[</span><span class="mi">10</span><span class="p">,</span> <span class="mi">4</span><span class="p">,</span> <span class="mi">25</span><span class="p">],</span>
+<span class="p">})</span>
+<span class="n">df</span><span class="p">[</span><span class="s2">"value"</span><span class="p">]</span> <span class="o">=</span> <span class="n">df</span><span class="p">[</span><span class="s2">"price"</span><span class="p">]</span> <span class="o">*</span> <span class="n">df</span><span class="p">[</span><span class="s2">"shares"</span><span class="p">]</span>      <span class="c1"># a new column, vectorised</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">df</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">df</span><span class="o">.</span><span class="n">dtypes</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">"total value:"</span><span class="p">,</span> <span class="n">df</span><span class="p">[</span><span class="s2">"value"</span><span class="p">]</span><span class="o">.</span><span class="n">sum</span><span class="p">())</span>
+</code></pre>
+<pre class="out">  ticker  price  shares   value
+0   AAPL  270.4      10  2704.0
+1   MSFT  517.8       4  2071.2
+2     KO   69.1      25  1727.5
+ticker        str
+price     float64
+shares      int64
+value     float64
+dtype: object
+total value: 6502.7</pre>
+<h2 id="loading-real-data">Loading real data</h2>
+<p><code>pd.read_csv</code> is the workhorse. Tell it which columns are dates with <code>parse_dates</code>; otherwise dates are just text.</p>
+<pre class="code"><code><span class="n">prices</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span><span class="n">DATA</span> <span class="o">/</span> <span class="s2">"prices_long.csv"</span><span class="p">,</span> <span class="n">parse_dates</span><span class="o">=</span><span class="p">[</span><span class="s2">"date"</span><span class="p">])</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">prices</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span>
+<span class="n">prices</span><span class="o">.</span><span class="n">head</span><span class="p">()</span>
+</code></pre>
+<pre class="out">(39830, 8)</pre><div class="out df"><div>
+
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th>date</th>
+      <th>ticker</th>
+      <th>open</th>
+      <th>high</th>
+      <th>low</th>
+      <th>close</th>
+      <th>adj_close</th>
+      <th>volume</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th>0</th>
+      <td>2010-01-04</td>
+      <td>AAPL</td>
+      <td>7.6225</td>
+      <td>7.6607</td>
+      <td>7.5850</td>
+      <td>7.6432</td>
+      <td>6.4010</td>
+      <td>493729600</td>
+    </tr>
+    <tr>
+      <th>1</th>
+      <td>2010-01-05</td>
+      <td>AAPL</td>
+      <td>7.6643</td>
+      <td>7.6996</td>
+      <td>7.6161</td>
+      <td>7.6564</td>
+      <td>6.4120</td>
+      <td>601904800</td>
+    </tr>
+    <tr>
+      <th>2</th>
+      <td>2010-01-06</td>
+      <td>AAPL</td>
+      <td>7.6564</td>
+      <td>7.6868</td>
+      <td>7.5268</td>
+      <td>7.5346</td>
+      <td>6.3100</td>
+      <td>552160000</td>
+    </tr>
+    <tr>
+      <th>3</th>
+      <td>2010-01-07</td>
+      <td>AAPL</td>
+      <td>7.5625</td>
+      <td>7.5714</td>
+      <td>7.4661</td>
+      <td>7.5207</td>
+      <td>6.2984</td>
+      <td>477131200</td>
+    </tr>
+    <tr>
+      <th>4</th>
+      <td>2010-01-08</td>
+      <td>AAPL</td>
+      <td>7.5107</td>
+      <td>7.5714</td>
+      <td>7.4664</td>
+      <td>7.5707</td>
+      <td>6.3402</td>
+      <td>447610800</td>
+    </tr>
+  </tbody>
+</table>
+</div></div>
+<pre class="code"><code><span class="n">prices</span><span class="o">.</span><span class="n">info</span><span class="p">()</span>
+</code></pre>
+<pre class="out">&lt;class &#x27;pandas.DataFrame&#x27;&gt;
+RangeIndex: 39830 entries, 0 to 39829
+Data columns (total 8 columns):
+ #   Column     Non-Null Count  Dtype         
+---  ------     --------------  -----         
+ 0   date       39830 non-null  datetime64[us]
+ 1   ticker     39830 non-null  str           
+ 2   open       39830 non-null  float64       
+ 3   high       39830 non-null  float64       
+ 4   low        39830 non-null  float64       
+ 5   close      39830 non-null  float64       
+ 6   adj_close  39830 non-null  float64       
+ 7   volume     39830 non-null  int64         
+dtypes: datetime64[us](1), float64(5), int64(1), str(1)
+memory usage: 2.5 MB</pre>
+<p>The file is in <strong>long format</strong>: one row per (date, ticker) pair. That is how databases store prices. <code>close</code> is the trading price (adjusted for stock splits by Yahoo), <code>adj_close</code> is additionally adjusted for dividends, and <code>volume</code> is the number of shares traded.</p>
+<pre class="code"><code><span class="nb">print</span><span class="p">(</span><span class="n">prices</span><span class="p">[</span><span class="s2">"ticker"</span><span class="p">]</span><span class="o">.</span><span class="n">unique</span><span class="p">())</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">prices</span><span class="p">[</span><span class="s2">"ticker"</span><span class="p">]</span><span class="o">.</span><span class="n">value_counts</span><span class="p">()</span><span class="o">.</span><span class="n">head</span><span class="p">(</span><span class="mi">3</span><span class="p">))</span>
+<span class="n">prices</span><span class="o">.</span><span class="n">describe</span><span class="p">()</span><span class="o">.</span><span class="n">T</span>
+</code></pre>
+<pre class="out">&lt;ArrowStringArray&gt;
+[&#x27;AAPL&#x27;, &#x27;EEM&#x27;, &#x27;GLD&#x27;, &#x27;JPM&#x27;, &#x27;KO&#x27;, &#x27;MSFT&#x27;, &#x27;QQQ&#x27;, &#x27;SPY&#x27;, &#x27;TLT&#x27;, &#x27;XOM&#x27;]
+Length: 10, dtype: str
+ticker
+AAPL    3983
+EEM     3983
+GLD     3983
+Name: count, dtype: int64</pre><div class="out df"><div>
+
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th>count</th>
+      <th>mean</th>
+      <th>min</th>
+      <th>25%</th>
+      <th>50%</th>
+      <th>75%</th>
+      <th>max</th>
+      <th>std</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th>date</th>
+      <td>39830</td>
+      <td>2017-11-30 18:25:34.722571</td>
+      <td>2010-01-04 00:00:00</td>
+      <td>2013-12-16 00:00:00</td>
+      <td>2017-11-29 00:00:00</td>
+      <td>2021-11-12 00:00:00</td>
+      <td>2025-10-31 00:00:00</td>
+      <td>NaN</td>
+    </tr>
+    <tr>
+      <th>open</th>
+      <td>39830.0</td>
+      <td>127.4089</td>
+      <td>6.8704</td>
+      <td>46.07</td>
+      <td>97.895</td>
+      <td>155.8</td>
+      <td>688.72</td>
+      <td>112.6369</td>
+    </tr>
+    <tr>
+      <th>high</th>
+      <td>39830.0</td>
+      <td>128.2822</td>
+      <td>7.0</td>
+      <td>46.38</td>
+      <td>98.735</td>
+      <td>156.9175</td>
+      <td>689.7</td>
+      <td>113.3532</td>
+    </tr>
+    <tr>
+      <th>low</th>
+      <td>39830.0</td>
+      <td>126.4993</td>
+      <td>6.7946</td>
+      <td>45.79</td>
+      <td>97.22</td>
+      <td>154.685</td>
+      <td>684.83</td>
+      <td>111.8482</td>
+    </tr>
+    <tr>
+      <th>close</th>
+      <td>39830.0</td>
+      <td>127.436</td>
+      <td>6.8589</td>
+      <td>46.09</td>
+      <td>98.0</td>
+      <td>155.985</td>
+      <td>687.39</td>
+      <td>112.657</td>
+    </tr>
+    <tr>
+      <th>adj_close</th>
+      <td>39830.0</td>
+      <td>114.7475</td>
+      <td>5.7441</td>
+      <td>38.098</td>
+      <td>80.4745</td>
+      <td>143.553</td>
+      <td>680.0531</td>
+      <td>112.118</td>
+    </tr>
+    <tr>
+      <th>volume</th>
+      <td>39830.0</td>
+      <td>54081801.17</td>
+      <td>987200.0</td>
+      <td>12419650.0</td>
+      <td>24732150.0</td>
+      <td>56734550.0</td>
+      <td>1880998000.0</td>
+      <td>96161308.9196</td>
+    </tr>
+  </tbody>
+</table>
+</div></div>
+<h2 id="selecting-data-loc-iloc">Selecting data: <code>[]</code>, <code>.loc</code>, <code>.iloc</code></h2>
+<p>There are three ways to select, and mixing them up is the most common pandas confusion:</p>
+<table>
+<thead>
+<tr>
+<th>Syntax</th>
+<th>Selects by</th>
+<th>Example</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>df["col"]</code>, <code>df[["a", "b"]]</code></td>
+<td>column name(s)</td>
+<td><code>prices["close"]</code></td>
+</tr>
+<tr>
+<td><code>df.loc[rows, cols]</code></td>
+<td><strong>labels</strong> (index values, column names, boolean masks)</td>
+<td><code>df.loc["2020-03", "SPY"]</code></td>
+</tr>
+<tr>
+<td><code>df.iloc[rows, cols]</code></td>
+<td><strong>positions</strong> (0, 1, 2, …)</td>
+<td><code>df.iloc[-5:, 0]</code></td>
+</tr>
+</tbody>
+</table>
+<pre class="code"><code><span class="n">spy</span> <span class="o">=</span> <span class="n">prices</span><span class="p">[</span><span class="n">prices</span><span class="p">[</span><span class="s2">"ticker"</span><span class="p">]</span> <span class="o">==</span> <span class="s2">"SPY"</span><span class="p">]</span>               <span class="c1"># boolean mask on rows</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">spy</span><span class="p">[[</span><span class="s2">"date"</span><span class="p">,</span> <span class="s2">"close"</span><span class="p">,</span> <span class="s2">"volume"</span><span class="p">]]</span><span class="o">.</span><span class="n">tail</span><span class="p">(</span><span class="mi">3</span><span class="p">))</span>
+<span class="n">big_days</span> <span class="o">=</span> <span class="n">prices</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">prices</span><span class="p">[</span><span class="s2">"volume"</span><span class="p">]</span> <span class="o">&gt;</span> <span class="mf">5e8</span><span class="p">,</span> <span class="p">[</span><span class="s2">"date"</span><span class="p">,</span> <span class="s2">"ticker"</span><span class="p">,</span> <span class="s2">"volume"</span><span class="p">]]</span>
+<span class="nb">print</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">big_days</span><span class="p">),</span> <span class="s2">"rows with more than 500 million shares traded;"</span><span class="p">,</span> <span class="n">big_days</span><span class="p">[</span><span class="s2">"ticker"</span><span class="p">]</span><span class="o">.</span><span class="n">unique</span><span class="p">())</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">prices</span><span class="o">.</span><span class="n">query</span><span class="p">(</span><span class="s2">"ticker == 'KO' and close &gt; 70"</span><span class="p">)</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span>   <span class="c1"># the same idea as a string</span>
+</code></pre>
+<pre class="out">            date   close    volume
+31861 2025-10-29  687.39  85657100
+31862 2025-10-30  679.83  76335800
+31863 2025-10-31  682.06  87164100
+433 rows with more than 500 million shares traded; &lt;ArrowStringArray&gt;
+[&#x27;AAPL&#x27;, &#x27;SPY&#x27;]
+Length: 2, dtype: str</pre><pre class="out">(122, 8)</pre>
+<h3 id="setting-values-the-right-way-copy-on-write">Setting values the right way (copy-on-write)</h3>
+<p>Writing <code>df[df.a &gt; 0]["b"] = 1</code> is <strong>chained assignment</strong>: the first <code>[]</code> makes a new object and the second writes into it, so the original never changes. Modern pandas (copy-on-write, the default in pandas 3) guarantees that any object you get from indexing behaves as a copy. To modify a DataFrame, always use one <code>.loc</code> call.</p>
+<pre class="code"><code><span class="n">d</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">({</span><span class="s2">"r"</span><span class="p">:</span> <span class="p">[</span><span class="mf">0.01</span><span class="p">,</span> <span class="o">-</span><span class="mf">0.02</span><span class="p">,</span> <span class="mf">0.03</span><span class="p">],</span> <span class="s2">"signal"</span><span class="p">:</span> <span class="mi">0</span><span class="p">})</span>
+<span class="n">d</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">d</span><span class="p">[</span><span class="s2">"r"</span><span class="p">]</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">,</span> <span class="s2">"signal"</span><span class="p">]</span> <span class="o">=</span> <span class="mi">1</span>            <span class="c1"># one .loc: rows and column together</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">d</span><span class="p">)</span>
+</code></pre>
+<pre class="out">      r  signal
+0  0.01       1
+1 -0.02       0
+2  0.03       1</pre>
+<div class="box trap">
+<p class="lab">Trap</p>
+<p>If you write <code>sub = df[df.ticker == "SPY"]</code> and then modify <code>sub</code>, the original <code>df</code> is not changed (with copy-on-write). That is usually what you want. If you <em>meant</em> to change <code>df</code>, use <code>df.loc[mask, col] = …</code>.</p>
+</div>
+<h2 id="from-long-to-wide-one-column-per-ticker">From long to wide: one column per ticker</h2>
+<p>Most analysis wants a <strong>wide</strong> table: dates down the rows, one column per asset. <code>pivot</code> reshapes long into wide; <code>melt</code> goes back.</p>
+<pre class="code"><code><span class="n">close</span> <span class="o">=</span> <span class="n">prices</span><span class="o">.</span><span class="n">pivot</span><span class="p">(</span><span class="n">index</span><span class="o">=</span><span class="s2">"date"</span><span class="p">,</span> <span class="n">columns</span><span class="o">=</span><span class="s2">"ticker"</span><span class="p">,</span> <span class="n">values</span><span class="o">=</span><span class="s2">"adj_close"</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">close</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span>
+<span class="n">close</span><span class="o">.</span><span class="n">tail</span><span class="p">(</span><span class="mi">3</span><span class="p">)</span>
+</code></pre>
+<pre class="out">(3983, 10)</pre><div class="out df"><div>
+
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th>ticker</th>
+      <th>AAPL</th>
+      <th>EEM</th>
+      <th>GLD</th>
+      <th>JPM</th>
+      <th>KO</th>
+      <th>MSFT</th>
+      <th>QQQ</th>
+      <th>SPY</th>
+      <th>TLT</th>
+      <th>XOM</th>
+    </tr>
+    <tr>
+      <th>date</th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th>2025-10-29</th>
+      <td>268.7074</td>
+      <td>54.9342</td>
+      <td>363.00</td>
+      <td>299.7372</td>
+      <td>66.5800</td>
+      <td>537.1306</td>
+      <td>632.7968</td>
+      <td>680.0531</td>
+      <td>87.4026</td>
+      <td>113.1700</td>
+    </tr>
+    <tr>
+      <th>2025-10-30</th>
+      <td>270.4011</td>
+      <td>54.3654</td>
+      <td>370.13</td>
+      <td>303.5929</td>
+      <td>67.1937</td>
+      <td>521.4695</td>
+      <td>623.1223</td>
+      <td>672.5738</td>
+      <td>86.8941</td>
+      <td>111.4596</td>
+    </tr>
+    <tr>
+      <th>2025-10-31</th>
+      <td>269.3749</td>
+      <td>54.2379</td>
+      <td>368.12</td>
+      <td>305.2411</td>
+      <td>67.1158</td>
+      <td>513.5844</td>
+      <td>626.1281</td>
+      <td>674.7800</td>
+      <td>86.6350</td>
+      <td>111.1389</td>
+    </tr>
+  </tbody>
+</table>
+</div></div>
+<pre class="code"><code><span class="n">back</span> <span class="o">=</span> <span class="n">close</span><span class="o">.</span><span class="n">reset_index</span><span class="p">()</span><span class="o">.</span><span class="n">melt</span><span class="p">(</span><span class="n">id_vars</span><span class="o">=</span><span class="s2">"date"</span><span class="p">,</span> <span class="n">var_name</span><span class="o">=</span><span class="s2">"ticker"</span><span class="p">,</span> <span class="n">value_name</span><span class="o">=</span><span class="s2">"adj_close"</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">back</span><span class="o">.</span><span class="n">head</span><span class="p">(</span><span class="mi">3</span><span class="p">));</span> <span class="nb">print</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">back</span><span class="p">),</span> <span class="s2">"rows (NaN cells included)"</span><span class="p">)</span>
+</code></pre>
+<pre class="out">        date ticker  adj_close
+0 2010-01-04   AAPL      6.401
+1 2010-01-05   AAPL      6.412
+2 2010-01-06   AAPL      6.310
+39830 rows (NaN cells included)</pre>
+<p>The <strong>Reshape</strong> tab of the playground below animates <code>pivot</code> and <code>melt</code> on a tiny table.</p>
+<div class="playground"><div class="pg-bar"><span>Interactive playground</span><a href="animations/pandas_playground.html" target="_blank" rel="noopener">open full screen ↗</a></div><iframe src="animations/pandas_playground.html" loading="lazy" style="height:640px" title="Interactive playground"></iframe></div>
+
+<h2 id="the-datetimeindex-dates-as-the-index">The DatetimeIndex: dates as the index</h2>
+<p>With dates as the index, you can select periods with strings, and pandas understands calendars.</p>
+<pre class="code"><code><span class="nb">print</span><span class="p">(</span><span class="nb">type</span><span class="p">(</span><span class="n">close</span><span class="o">.</span><span class="n">index</span><span class="p">),</span> <span class="n">close</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">min</span><span class="p">()</span><span class="o">.</span><span class="n">date</span><span class="p">(),</span> <span class="s2">"→"</span><span class="p">,</span> <span class="n">close</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">max</span><span class="p">()</span><span class="o">.</span><span class="n">date</span><span class="p">())</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">close</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="s2">"2020-03-16"</span><span class="p">,</span> <span class="p">[</span><span class="s2">"SPY"</span><span class="p">,</span> <span class="s2">"TLT"</span><span class="p">,</span> <span class="s2">"GLD"</span><span class="p">]])</span>        <span class="c1"># one day</span>
+<span class="n">covid</span> <span class="o">=</span> <span class="n">close</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="s2">"2020-02-19"</span><span class="p">:</span><span class="s2">"2020-03-23"</span><span class="p">,</span> <span class="s2">"SPY"</span><span class="p">]</span>                <span class="c1"># the COVID crash</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"first </span><span class="si">{</span><span class="n">covid</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2">, last </span><span class="si">{</span><span class="n">covid</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2">, low </span><span class="si">{</span><span class="n">covid</span><span class="o">.</span><span class="n">min</span><span class="p">()</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2"> on </span><span class="si">{</span><span class="n">covid</span><span class="o">.</span><span class="n">idxmin</span><span class="p">()</span><span class="o">.</span><span class="n">date</span><span class="p">()</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">"trading days in 2024:"</span><span class="p">,</span> <span class="n">close</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="s2">"2024"</span><span class="p">]</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+</code></pre>
+<pre class="out">&lt;class &#x27;pandas.DatetimeIndex&#x27;&gt; 2010-01-04 → 2025-10-31
+ticker
+SPY    218.0864
+TLT    134.4127
+GLD    141.6400
+Name: 2020-03-16 00:00:00, dtype: float64
+first 307.64, last 203.91, low 203.91 on 2020-03-23
+trading days in 2024: 252</pre>
+<h3 id="returns-pct-change-shift-and-log-returns">Returns: <code>pct_change</code>, <code>shift</code> and log returns</h3>
+<pre class="code"><code><span class="n">rets</span> <span class="o">=</span> <span class="n">close</span><span class="o">.</span><span class="n">pct_change</span><span class="p">(</span><span class="n">fill_method</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span>              <span class="c1"># P_t / P_{t-1} - 1, per column</span>
+<span class="n">logr</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">close</span><span class="p">)</span><span class="o">.</span><span class="n">diff</span><span class="p">()</span>                            <span class="c1"># ln P_t - ln P_{t-1}</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">rets</span><span class="p">[[</span><span class="s2">"SPY"</span><span class="p">,</span> <span class="s2">"AAPL"</span><span class="p">]]</span><span class="o">.</span><span class="n">tail</span><span class="p">(</span><span class="mi">3</span><span class="p">))</span>
+<span class="n">same</span> <span class="o">=</span> <span class="p">(</span><span class="n">close</span> <span class="o">/</span> <span class="n">close</span><span class="o">.</span><span class="n">shift</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span>                    <span class="c1"># what pct_change does</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">"identical:"</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">allclose</span><span class="p">(</span><span class="n">same</span><span class="o">.</span><span class="n">dropna</span><span class="p">(),</span> <span class="n">rets</span><span class="o">.</span><span class="n">dropna</span><span class="p">()))</span>
+</code></pre>
+<pre class="out">ticker         SPY    AAPL
+date                      
+2025-10-29  0.0005  0.0026
+2025-10-30 -0.0110  0.0063
+2025-10-31  0.0033 -0.0038
+identical: True</pre>
+<p><code>shift(1)</code> moves every value one row <strong>down</strong>: on each date you see yesterday's value. That is exactly how you avoid look-ahead bias: a signal computed with data up to today can only be traded from tomorrow.</p>
+<div class="box trap">
+<p class="lab">Trap</p>
+<p><code>shift(-1)</code> moves values <strong>up</strong>: tomorrow's value appears today. It is the right tool to build a <em>target</em> (what you want to predict), and the most dangerous line in quant finance if it leaks into your <em>features</em>. Every backtest bug that looks too good to be true starts here. The <strong>Shift</strong> tab of the playground shows both directions.</p>
+</div>
+<h3 id="price-return-versus-total-return">Price return versus total return</h3>
+<p><code>close</code> ignores dividends; <code>adj_close</code> reinvests them. For high-dividend assets the difference is huge.</p>
+<pre class="code"><code><span class="k">def</span><span class="w"> </span><span class="nf">total_growth</span><span class="p">(</span><span class="n">px</span><span class="p">):</span>
+    <span class="n">px</span> <span class="o">=</span> <span class="n">px</span><span class="o">.</span><span class="n">dropna</span><span class="p">()</span>
+    <span class="k">return</span> <span class="n">px</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">/</span> <span class="n">px</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+
+<span class="n">wide_close</span> <span class="o">=</span> <span class="n">prices</span><span class="o">.</span><span class="n">pivot</span><span class="p">(</span><span class="n">index</span><span class="o">=</span><span class="s2">"date"</span><span class="p">,</span> <span class="n">columns</span><span class="o">=</span><span class="s2">"ticker"</span><span class="p">,</span> <span class="n">values</span><span class="o">=</span><span class="s2">"close"</span><span class="p">)</span>
+<span class="n">cmp</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">({</span>
+    <span class="s2">"price return"</span><span class="p">:</span> <span class="n">wide_close</span><span class="o">.</span><span class="n">apply</span><span class="p">(</span><span class="n">total_growth</span><span class="p">)</span> <span class="o">-</span> <span class="mi">1</span><span class="p">,</span>
+    <span class="s2">"total return"</span><span class="p">:</span> <span class="n">close</span><span class="o">.</span><span class="n">apply</span><span class="p">(</span><span class="n">total_growth</span><span class="p">)</span> <span class="o">-</span> <span class="mi">1</span><span class="p">,</span>
+<span class="p">})</span><span class="o">.</span><span class="n">sort_values</span><span class="p">(</span><span class="s2">"total return"</span><span class="p">)</span>
+<span class="n">cmp</span><span class="p">[</span><span class="s2">"gap"</span><span class="p">]</span> <span class="o">=</span> <span class="n">cmp</span><span class="p">[</span><span class="s2">"total return"</span><span class="p">]</span> <span class="o">-</span> <span class="n">cmp</span><span class="p">[</span><span class="s2">"price return"</span><span class="p">]</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">cmp</span><span class="o">.</span><span class="n">round</span><span class="p">(</span><span class="mi">2</span><span class="p">))</span>
+<span class="n">R</span><span class="p">[</span><span class="s2">"tlt_price"</span><span class="p">]</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">cmp</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="s1">'TLT'</span><span class="p">,</span><span class="w"> </span><span class="s1">'price return'</span><span class="p">]</span><span class="si">:</span><span class="s2">+.0%</span><span class="si">}</span><span class="s2">"</span>
+<span class="n">R</span><span class="p">[</span><span class="s2">"tlt_total"</span><span class="p">]</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">cmp</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="s1">'TLT'</span><span class="p">,</span><span class="w"> </span><span class="s1">'total return'</span><span class="p">]</span><span class="si">:</span><span class="s2">+.0%</span><span class="si">}</span><span class="s2">"</span>
+</code></pre>
+<pre class="out">        price return  total return   gap
+ticker                                  
+TLT             0.01          0.57  0.57
+EEM             0.29          0.80  0.50
+XOM             0.65          1.99  1.34
+GLD             2.35          2.35  0.00
+KO              1.42          2.92  1.51
+SPY             5.02          7.00  1.98
+JPM             6.26          9.90  3.64
+QQQ            12.55         14.57  2.02
+MSFT           15.73         21.35  5.61
+AAPL           34.37         41.08  6.71</pre>
+<p>Long Treasury bonds (TLT) show +1% on price alone but +57% once their interest payments are counted. Any backtest that uses unadjusted closes for a dividend-paying asset is wrong.</p>
+<h2 id="missing-data">Missing data</h2>
+<p><code>NaN</code> marks a missing value. In price tables it comes from holidays that differ between sources, assets that did not exist yet, and data errors.</p>
+<pre class="code"><code><span class="n">merged</span> <span class="o">=</span> <span class="n">close</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">pd</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span><span class="n">DATA</span> <span class="o">/</span> <span class="s2">"fred_rates.csv"</span><span class="p">,</span> <span class="n">index_col</span><span class="o">=</span><span class="s2">"date"</span><span class="p">,</span> <span class="n">parse_dates</span><span class="o">=</span><span class="kc">True</span><span class="p">))</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">merged</span><span class="o">.</span><span class="n">isna</span><span class="p">()</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span><span class="o">.</span><span class="n">tail</span><span class="p">(</span><span class="mi">4</span><span class="p">))</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">merged</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="s2">"2024-11-07"</span><span class="p">:</span><span class="s2">"2024-11-13"</span><span class="p">,</span> <span class="p">[</span><span class="s2">"SPY"</span><span class="p">,</span> <span class="s2">"DGS10"</span><span class="p">,</span> <span class="s2">"VIXCLS"</span><span class="p">]])</span>
+</code></pre>
+<pre class="out">XOM        0
+DGS3MO    29
+DGS10     29
+VIXCLS     0
+dtype: int64
+                 SPY  DGS10  VIXCLS
+date                               
+2024-11-07  582.1750   4.31   15.20
+2024-11-08  584.6968   4.30   14.94
+2024-11-11  585.2539    NaN   14.97
+2024-11-12  583.4359   4.43   14.71
+2024-11-13  583.7194   4.44   14.02</pre>
+<p>On 11 November 2024 (Veterans Day) the stock market was open but the bond market was closed, so the Treasury yield is missing while SPY has a price. The fixes:</p>
+<pre class="code"><code><span class="n">m</span> <span class="o">=</span> <span class="n">merged</span><span class="p">[[</span><span class="s2">"SPY"</span><span class="p">,</span> <span class="s2">"DGS10"</span><span class="p">,</span> <span class="s2">"VIXCLS"</span><span class="p">]]</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">"drop rows with any NaN:"</span><span class="p">,</span> <span class="n">m</span><span class="o">.</span><span class="n">dropna</span><span class="p">()</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">"forward fill:"</span><span class="p">,</span> <span class="n">m</span><span class="o">.</span><span class="n">ffill</span><span class="p">()</span><span class="o">.</span><span class="n">isna</span><span class="p">()</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span><span class="o">.</span><span class="n">to_dict</span><span class="p">())</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">m</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="s2">"2024-11-11"</span><span class="p">]</span><span class="o">.</span><span class="n">to_dict</span><span class="p">(),</span> <span class="s2">"→ ffill →"</span><span class="p">,</span> <span class="n">m</span><span class="o">.</span><span class="n">ffill</span><span class="p">()</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="s2">"2024-11-11"</span><span class="p">]</span><span class="o">.</span><span class="n">to_dict</span><span class="p">())</span>
+</code></pre>
+<pre class="out">drop rows with any NaN: (3954, 3)
+forward fill: {&#x27;SPY&#x27;: 0, &#x27;DGS10&#x27;: 0, &#x27;VIXCLS&#x27;: 0}</pre><pre class="out">{&#x27;SPY&#x27;: 585.2539, &#x27;DGS10&#x27;: nan, &#x27;VIXCLS&#x27;: 14.97} → ffill → {&#x27;SPY&#x27;: 585.2539, &#x27;DGS10&#x27;: 4.3, &#x27;VIXCLS&#x27;: 14.97}</pre>
+<div class="box trap">
+<p class="lab">Trap</p>
+<p><code>ffill()</code> (carry the last known value forward) is safe: on each day it uses only the past. <code>bfill()</code> (fill from the next value) and <code>interpolate()</code> use the <strong>future</strong>, so they leak information into a backtest. Use them only for plotting, never for signals.</p>
+</div>
+<h2 id="resampling-changing-the-frequency">Resampling: changing the frequency</h2>
+<p><code>resample</code> groups the time index into bins (weeks, months, years) and aggregates each bin. To get monthly returns from daily prices, take the last price of each month, then compute returns.</p>
+<pre class="code"><code><span class="n">monthly_px</span> <span class="o">=</span> <span class="n">close</span><span class="o">.</span><span class="n">resample</span><span class="p">(</span><span class="s2">"ME"</span><span class="p">)</span><span class="o">.</span><span class="n">last</span><span class="p">()</span>        <span class="c1"># "ME" = month end</span>
+<span class="n">monthly_ret</span> <span class="o">=</span> <span class="n">monthly_px</span><span class="o">.</span><span class="n">pct_change</span><span class="p">(</span><span class="n">fill_method</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">monthly_ret</span><span class="p">[[</span><span class="s2">"SPY"</span><span class="p">,</span> <span class="s2">"TLT"</span><span class="p">,</span> <span class="s2">"GLD"</span><span class="p">]]</span><span class="o">.</span><span class="n">tail</span><span class="p">(</span><span class="mi">4</span><span class="p">))</span>
+<span class="n">yearly</span> <span class="o">=</span> <span class="n">close</span><span class="o">.</span><span class="n">resample</span><span class="p">(</span><span class="s2">"YE"</span><span class="p">)</span><span class="o">.</span><span class="n">last</span><span class="p">()</span><span class="o">.</span><span class="n">pct_change</span><span class="p">(</span><span class="n">fill_method</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span>
+<span class="n">yearly</span><span class="o">.</span><span class="n">index</span> <span class="o">=</span> <span class="n">yearly</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">year</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">yearly</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="mi">2018</span><span class="p">:</span><span class="mi">2025</span><span class="p">,</span> <span class="p">[</span><span class="s2">"SPY"</span><span class="p">,</span> <span class="s2">"QQQ"</span><span class="p">,</span> <span class="s2">"TLT"</span><span class="p">,</span> <span class="s2">"GLD"</span><span class="p">]]</span><span class="o">.</span><span class="n">round</span><span class="p">(</span><span class="mi">3</span><span class="p">))</span>
+</code></pre>
+<pre class="out">ticker         SPY     TLT     GLD
+date                              
+2025-07-31  0.0230 -0.0114 -0.0061
+2025-08-31  0.0205  0.0001  0.0499
+2025-09-30  0.0356  0.0359  0.1176
+2025-10-31  0.0238  0.0138  0.0356</pre><pre class="out">ticker    SPY    QQQ    TLT    GLD
+date                              
+2018   -0.046 -0.001 -0.016 -0.019
+2019    0.312  0.390  0.141  0.179
+2020    0.183  0.484  0.182  0.248
+2021    0.287  0.274 -0.046 -0.041
+2022   -0.182 -0.326 -0.312 -0.008
+2023    0.262  0.549  0.028  0.127
+2024    0.249  0.256 -0.081  0.267
+2025    0.174  0.235  0.068  0.520</pre>
+<p>Prices aggregate with <code>last</code> (or <code>ohlc</code> for candles), volumes with <code>sum</code>, returns by compounding:</p>
+<pre class="code"><code><span class="n">spy_daily</span> <span class="o">=</span> <span class="n">prices</span><span class="p">[</span><span class="n">prices</span><span class="o">.</span><span class="n">ticker</span> <span class="o">==</span> <span class="s2">"SPY"</span><span class="p">]</span><span class="o">.</span><span class="n">set_index</span><span class="p">(</span><span class="s2">"date"</span><span class="p">)</span>
+<span class="n">weekly</span> <span class="o">=</span> <span class="n">spy_daily</span><span class="o">.</span><span class="n">resample</span><span class="p">(</span><span class="s2">"W-FRI"</span><span class="p">)</span><span class="o">.</span><span class="n">agg</span><span class="p">({</span><span class="s2">"open"</span><span class="p">:</span> <span class="s2">"first"</span><span class="p">,</span> <span class="s2">"high"</span><span class="p">:</span> <span class="s2">"max"</span><span class="p">,</span> <span class="s2">"low"</span><span class="p">:</span> <span class="s2">"min"</span><span class="p">,</span> <span class="s2">"close"</span><span class="p">:</span> <span class="s2">"last"</span><span class="p">,</span> <span class="s2">"volume"</span><span class="p">:</span> <span class="s2">"sum"</span><span class="p">})</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">weekly</span><span class="o">.</span><span class="n">tail</span><span class="p">(</span><span class="mi">3</span><span class="p">))</span>
+<span class="n">r</span> <span class="o">=</span> <span class="n">rets</span><span class="p">[</span><span class="s2">"SPY"</span><span class="p">]</span>
+<span class="n">compounded</span> <span class="o">=</span> <span class="p">(</span><span class="mi">1</span> <span class="o">+</span> <span class="n">r</span><span class="p">)</span><span class="o">.</span><span class="n">resample</span><span class="p">(</span><span class="s2">"ME"</span><span class="p">)</span><span class="o">.</span><span class="n">prod</span><span class="p">()</span> <span class="o">-</span> <span class="mi">1</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">"compounding daily returns = monthly return:"</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">allclose</span><span class="p">(</span><span class="n">compounded</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="mi">1</span><span class="p">:],</span> <span class="n">monthly_ret</span><span class="p">[</span><span class="s2">"SPY"</span><span class="p">]</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="mi">1</span><span class="p">:]))</span>
+</code></pre>
+<pre class="out">              open    high     low   close     volume
+date                                                 
+2025-10-17  660.65  670.23  653.17  664.39  457106900
+2025-10-24  667.32  678.47  663.30  677.25  337267400
+2025-10-31  682.73  689.70  679.24  682.06  374234900
+compounding daily returns = monthly return: True</pre>
+<h2 id="rolling-expanding-and-exponential-windows">Rolling, expanding and exponential windows</h2>
+<p>Rolling windows are the bread and butter of signals and risk: moving averages, rolling volatility, rolling correlations and betas.</p>
+<pre class="code"><code><span class="n">spy</span> <span class="o">=</span> <span class="n">close</span><span class="p">[</span><span class="s2">"SPY"</span><span class="p">]</span>
+<span class="n">ma50</span><span class="p">,</span> <span class="n">ma200</span> <span class="o">=</span> <span class="n">spy</span><span class="o">.</span><span class="n">rolling</span><span class="p">(</span><span class="mi">50</span><span class="p">)</span><span class="o">.</span><span class="n">mean</span><span class="p">(),</span> <span class="n">spy</span><span class="o">.</span><span class="n">rolling</span><span class="p">(</span><span class="mi">200</span><span class="p">)</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span>
+<span class="n">vol21</span> <span class="o">=</span> <span class="n">rets</span><span class="p">[</span><span class="s2">"SPY"</span><span class="p">]</span><span class="o">.</span><span class="n">rolling</span><span class="p">(</span><span class="mi">21</span><span class="p">)</span><span class="o">.</span><span class="n">std</span><span class="p">()</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="mi">252</span><span class="p">)</span>            <span class="c1"># 1-month realised vol, annualised</span>
+<span class="n">ewm_vol</span> <span class="o">=</span> <span class="n">rets</span><span class="p">[</span><span class="s2">"SPY"</span><span class="p">]</span><span class="o">.</span><span class="n">ewm</span><span class="p">(</span><span class="n">halflife</span><span class="o">=</span><span class="mi">21</span><span class="p">)</span><span class="o">.</span><span class="n">std</span><span class="p">()</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="mi">252</span><span class="p">)</span>
+<span class="n">corr</span> <span class="o">=</span> <span class="n">rets</span><span class="p">[</span><span class="s2">"SPY"</span><span class="p">]</span><span class="o">.</span><span class="n">rolling</span><span class="p">(</span><span class="mi">63</span><span class="p">)</span><span class="o">.</span><span class="n">corr</span><span class="p">(</span><span class="n">rets</span><span class="p">[</span><span class="s2">"TLT"</span><span class="p">])</span>                  <span class="c1"># 3-month stock-bond correlation</span>
+<span class="n">running_max</span> <span class="o">=</span> <span class="n">spy</span><span class="o">.</span><span class="n">expanding</span><span class="p">()</span><span class="o">.</span><span class="n">max</span><span class="p">()</span>
+<span class="n">drawdown</span> <span class="o">=</span> <span class="n">spy</span> <span class="o">/</span> <span class="n">running_max</span> <span class="o">-</span> <span class="mi">1</span>
+
+<span class="n">fig</span><span class="p">,</span> <span class="n">ax</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">subplots</span><span class="p">(</span><span class="mi">3</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">9</span><span class="p">,</span> <span class="mi">8</span><span class="p">),</span> <span class="n">sharex</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="n">ax</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">spy</span><span class="p">,</span> <span class="n">lw</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s2">"SPY (adj.)"</span><span class="p">);</span> <span class="n">ax</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">ma50</span><span class="p">,</span> <span class="n">lw</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s2">"50-day MA"</span><span class="p">);</span> <span class="n">ax</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">ma200</span><span class="p">,</span> <span class="n">lw</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s2">"200-day MA"</span><span class="p">)</span>
+<span class="n">ax</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">set_yscale</span><span class="p">(</span><span class="s2">"log"</span><span class="p">);</span> <span class="n">ax</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">legend</span><span class="p">();</span> <span class="n">ax</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">set_ylabel</span><span class="p">(</span><span class="s2">"price (log scale)"</span><span class="p">)</span>
+<span class="n">ax</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">vol21</span><span class="p">,</span> <span class="n">lw</span><span class="o">=</span><span class="mf">0.8</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s2">"21-day rolling"</span><span class="p">);</span> <span class="n">ax</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">ewm_vol</span><span class="p">,</span> <span class="n">lw</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s2">"EWM, half-life 21"</span><span class="p">)</span>
+<span class="n">ax</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">set_ylabel</span><span class="p">(</span><span class="s2">"annualised vol"</span><span class="p">);</span> <span class="n">ax</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">legend</span><span class="p">()</span>
+<span class="n">ax</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">corr</span><span class="p">,</span> <span class="n">lw</span><span class="o">=</span><span class="mf">0.8</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">"tab:purple"</span><span class="p">);</span> <span class="n">ax</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span><span class="o">.</span><span class="n">axhline</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s2">"k"</span><span class="p">,</span> <span class="n">lw</span><span class="o">=</span><span class="mf">0.6</span><span class="p">)</span>
+<span class="n">ax</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span><span class="o">.</span><span class="n">set_ylabel</span><span class="p">(</span><span class="s2">"SPY–TLT corr (63d)"</span><span class="p">)</span>
+<span class="n">save_fig</span><span class="p">(</span><span class="s2">"rolling_windows"</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+<span class="n">R</span><span class="p">[</span><span class="s2">"vol_peak"</span><span class="p">]</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">vol21</span><span class="o">.</span><span class="n">max</span><span class="p">()</span><span class="si">:</span><span class="s2">.0%</span><span class="si">}</span><span class="s2">"</span>
+<span class="n">R</span><span class="p">[</span><span class="s2">"vol_peak_date"</span><span class="p">]</span> <span class="o">=</span> <span class="n">vol21</span><span class="o">.</span><span class="n">idxmax</span><span class="p">()</span><span class="o">.</span><span class="n">strftime</span><span class="p">(</span><span class="s2">"%B %Y"</span><span class="p">)</span>
+<span class="n">R</span><span class="p">[</span><span class="s2">"mdd"</span><span class="p">]</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">drawdown</span><span class="o">.</span><span class="n">min</span><span class="p">()</span><span class="si">:</span><span class="s2">.0%</span><span class="si">}</span><span class="s2">"</span>
+<span class="n">R</span><span class="p">[</span><span class="s2">"corr_2022"</span><span class="p">]</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">corr</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="s1">'2022'</span><span class="p">]</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span><span class="si">:</span><span class="s2">+.2f</span><span class="si">}</span><span class="s2">"</span>
+<span class="n">R</span><span class="p">[</span><span class="s2">"corr_2010s"</span><span class="p">]</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">corr</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="s1">'2011'</span><span class="p">:</span><span class="s1">'2019'</span><span class="p">]</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span><span class="si">:</span><span class="s2">+.2f</span><span class="si">}</span><span class="s2">"</span>
+</code></pre>
+
+<figure><img src="images/rolling_windows.png" alt="Rolling windows on real data: moving averages (top), realised volatility (middle) and the stock–bond correlation (bottom)." loading="lazy"><figcaption><b>Figure 2-1.</b> Rolling windows on real data: moving averages (top), realised volatility (middle) and the stock–bond correlation (bottom).</figcaption></figure>
+
+<p>Three facts jump out, and each will come back in the Financial ML course:</p>
+<ul>
+<li>Volatility clusters: it peaked at 93% in April 2020 and stays high for weeks after a shock (Chapter 3 forecasts it).</li>
+<li>The worst SPY drawdown in the sample is -34%.</li>
+<li>The stock–bond correlation averaged -0.41 in 2011–2019 (bonds hedged stocks) but -0.02 in 2022, when stocks and bonds fell together. A portfolio built on the old correlation got hurt (Chapter 4).</li>
+</ul>
+<div class="box quant">
+<p class="lab">Quant view</p>
+<p><code>rolling(21)</code> gives <code>NaN</code> for the first 20 rows: there is not a full window yet. <code>min_periods</code> lets you start earlier with fewer points. <code>ewm(halflife=h)</code> weights recent observations more, with weights halving every <code>h</code> days. It reacts faster to a new regime, which is why the RiskMetrics volatility model uses it. Both only use the past, so they are safe for signals.</p>
+</div>
+<h2 id="groupby-split-apply-combine">groupby: split, apply, combine</h2>
+<p><code>groupby</code> splits a table into groups, applies a function to each, and combines the results. The <strong>Groupby</strong> tab of the playground animates the three steps.</p>
+<pre class="code"><code><span class="n">prices</span><span class="p">[</span><span class="s2">"ret"</span><span class="p">]</span> <span class="o">=</span> <span class="n">prices</span><span class="o">.</span><span class="n">groupby</span><span class="p">(</span><span class="s2">"ticker"</span><span class="p">)[</span><span class="s2">"adj_close"</span><span class="p">]</span><span class="o">.</span><span class="n">pct_change</span><span class="p">(</span><span class="n">fill_method</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span>   <span class="c1"># per ticker: never across tickers!</span>
+<span class="n">stats</span> <span class="o">=</span> <span class="n">prices</span><span class="o">.</span><span class="n">groupby</span><span class="p">(</span><span class="s2">"ticker"</span><span class="p">)[</span><span class="s2">"ret"</span><span class="p">]</span><span class="o">.</span><span class="n">agg</span><span class="p">(</span>
+    <span class="n">mean_daily</span><span class="o">=</span><span class="s2">"mean"</span><span class="p">,</span> <span class="n">vol_daily</span><span class="o">=</span><span class="s2">"std"</span><span class="p">,</span> <span class="n">best</span><span class="o">=</span><span class="s2">"max"</span><span class="p">,</span> <span class="n">worst</span><span class="o">=</span><span class="s2">"min"</span><span class="p">,</span> <span class="n">days</span><span class="o">=</span><span class="s2">"count"</span><span class="p">)</span>
+<span class="n">stats</span><span class="p">[</span><span class="s2">"ann_return"</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="mi">1</span> <span class="o">+</span> <span class="n">stats</span><span class="p">[</span><span class="s2">"mean_daily"</span><span class="p">])</span> <span class="o">**</span> <span class="mi">252</span> <span class="o">-</span> <span class="mi">1</span>
+<span class="n">stats</span><span class="p">[</span><span class="s2">"ann_vol"</span><span class="p">]</span> <span class="o">=</span> <span class="n">stats</span><span class="p">[</span><span class="s2">"vol_daily"</span><span class="p">]</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="mi">252</span><span class="p">)</span>
+<span class="n">stats</span><span class="p">[</span><span class="s2">"sharpe_0rf"</span><span class="p">]</span> <span class="o">=</span> <span class="n">stats</span><span class="p">[</span><span class="s2">"mean_daily"</span><span class="p">]</span> <span class="o">/</span> <span class="n">stats</span><span class="p">[</span><span class="s2">"vol_daily"</span><span class="p">]</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="mi">252</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">stats</span><span class="o">.</span><span class="n">sort_values</span><span class="p">(</span><span class="s2">"sharpe_0rf"</span><span class="p">,</span> <span class="n">ascending</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span><span class="o">.</span><span class="n">round</span><span class="p">(</span><span class="mi">3</span><span class="p">))</span>
+</code></pre>
+<pre class="out">        mean_daily  vol_daily   best  worst  days  ann_return  ann_vol  sharpe_0rf
+ticker                                                                            
+AAPL         0.001      0.018  0.153 -0.129  3982       0.319    0.283       0.978
+QQQ          0.001      0.013  0.120 -0.120  3982       0.215    0.207       0.944
+MSFT         0.001      0.016  0.142 -0.147  3982       0.258    0.255       0.897
+SPY          0.001      0.011  0.105 -0.109  3982       0.158    0.173       0.849
+JPM          0.001      0.017  0.180 -0.150  3982       0.208    0.276       0.685
+KO           0.000      0.011  0.065 -0.097  3982       0.106    0.171       0.592
+GLD          0.000      0.010  0.049 -0.088  3982       0.093    0.158       0.564
+XOM          0.000      0.016  0.127 -0.122  3982       0.106    0.249       0.403
+EEM          0.000      0.013  0.081 -0.125  3982       0.062    0.214       0.281
+TLT          0.000      0.010  0.075 -0.067  3982       0.041    0.152       0.265</pre>
+<div class="box trap">
+<p class="lab">Trap</p>
+<p><code>prices["adj_close"].pct_change()</code> on the long table would compute the “return” from the last AAPL price to the first EEM price where the tickers change. Group first. The same applies to <code>shift</code>, <code>rolling</code> and <code>diff</code> on long data.</p>
+</div>
+<p><code>transform</code> returns a result with the same shape as the input, aligned to the original rows. It is how you put a per-group statistic back into each row:</p>
+<pre class="code"><code><span class="n">prices</span><span class="p">[</span><span class="s2">"ret_z"</span><span class="p">]</span> <span class="o">=</span> <span class="n">prices</span><span class="o">.</span><span class="n">groupby</span><span class="p">(</span><span class="s2">"ticker"</span><span class="p">)[</span><span class="s2">"ret"</span><span class="p">]</span><span class="o">.</span><span class="n">transform</span><span class="p">(</span><span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="p">(</span><span class="n">x</span> <span class="o">-</span> <span class="n">x</span><span class="o">.</span><span class="n">mean</span><span class="p">())</span> <span class="o">/</span> <span class="n">x</span><span class="o">.</span><span class="n">std</span><span class="p">())</span>
+<span class="n">prices</span><span class="p">[</span><span class="s2">"vol_63"</span><span class="p">]</span> <span class="o">=</span> <span class="n">prices</span><span class="o">.</span><span class="n">groupby</span><span class="p">(</span><span class="s2">"ticker"</span><span class="p">)[</span><span class="s2">"ret"</span><span class="p">]</span><span class="o">.</span><span class="n">transform</span><span class="p">(</span><span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="n">x</span><span class="o">.</span><span class="n">rolling</span><span class="p">(</span><span class="mi">63</span><span class="p">)</span><span class="o">.</span><span class="n">std</span><span class="p">())</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">prices</span><span class="p">[[</span><span class="s2">"date"</span><span class="p">,</span> <span class="s2">"ticker"</span><span class="p">,</span> <span class="s2">"ret"</span><span class="p">,</span> <span class="s2">"ret_z"</span><span class="p">,</span> <span class="s2">"vol_63"</span><span class="p">]]</span><span class="o">.</span><span class="n">dropna</span><span class="p">()</span><span class="o">.</span><span class="n">tail</span><span class="p">(</span><span class="mi">3</span><span class="p">))</span>
+</code></pre>
+<pre class="out">            date ticker     ret   ret_z  vol_63
+39827 2025-10-29    XOM  0.0123  0.7608  0.0114
+39828 2025-10-30    XOM -0.0151 -0.9880  0.0113
+39829 2025-10-31    XOM -0.0029 -0.2086  0.0110</pre>
+<h3 id="cross-sectional-ranks-comparing-assets-on-each-date">Cross-sectional ranks: comparing assets on each date</h3>
+<p>Grouping by <strong>date</strong> instead of ticker compares assets with each other on each day. This is the heart of cross-sectional strategies (Chapter 6): each month, rank assets on their past 12-month return and buy the leaders.</p>
+<pre class="code"><code><span class="n">mom12</span> <span class="o">=</span> <span class="n">monthly_px</span><span class="o">.</span><span class="n">pct_change</span><span class="p">(</span><span class="mi">12</span><span class="p">,</span> <span class="n">fill_method</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span>            <span class="c1"># 12-month return, per column</span>
+<span class="n">rank</span> <span class="o">=</span> <span class="n">mom12</span><span class="o">.</span><span class="n">rank</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">ascending</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>        <span class="c1"># 1 = strongest on that date</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">rank</span><span class="o">.</span><span class="n">tail</span><span class="p">(</span><span class="mi">3</span><span class="p">))</span>
+<span class="n">top3_next_month</span> <span class="o">=</span> <span class="p">(</span><span class="n">rank</span><span class="o">.</span><span class="n">shift</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span> <span class="o">&lt;=</span> <span class="mi">3</span><span class="p">)</span>            <span class="c1"># decided last month, held this month</span>
+<span class="n">strategy</span> <span class="o">=</span> <span class="p">(</span><span class="n">monthly_ret</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">top3_next_month</span><span class="p">))</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+<span class="n">equal</span> <span class="o">=</span> <span class="n">monthly_ret</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+<span class="n">both</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">({</span><span class="s2">"top-3 momentum"</span><span class="p">:</span> <span class="n">strategy</span><span class="p">,</span> <span class="s2">"equal weight"</span><span class="p">:</span> <span class="n">equal</span><span class="p">})</span><span class="o">.</span><span class="n">dropna</span><span class="p">()</span>
+<span class="nb">print</span><span class="p">(((</span><span class="mi">1</span> <span class="o">+</span> <span class="n">both</span><span class="p">)</span><span class="o">.</span><span class="n">prod</span><span class="p">()</span> <span class="o">**</span> <span class="p">(</span><span class="mi">12</span> <span class="o">/</span> <span class="nb">len</span><span class="p">(</span><span class="n">both</span><span class="p">))</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span><span class="o">.</span><span class="n">round</span><span class="p">(</span><span class="mi">3</span><span class="p">)</span><span class="o">.</span><span class="n">to_dict</span><span class="p">())</span>
+</code></pre>
+<pre class="out">ticker      AAPL  EEM  GLD  JPM    KO  MSFT  QQQ  SPY   TLT   XOM
+date                                                             
+2025-08-31   7.0  5.0  1.0  2.0   9.0   3.0  4.0  6.0  10.0   8.0
+2025-09-30   7.0  5.0  2.0  1.0  10.0   4.0  3.0  6.0   9.0   8.0
+2025-10-31   7.0  5.0  1.0  2.0   8.0   4.0  3.0  6.0   9.0  10.0
+{&#x27;top-3 momentum&#x27;: 0.146, &#x27;equal weight&#x27;: 0.139}</pre>
+<p>The <code>shift(1)</code> makes sure we rank using information known at the end of the previous month. Whether the momentum version is really better, and whether the difference is luck, is exactly what the Financial ML course will teach you to test.</p>
+<h2 id="combining-tables-concat-merge-join-merge-asof">Combining tables: <code>concat</code>, <code>merge</code>, <code>join</code>, <code>merge_asof</code></h2>
+<pre class="code"><code><span class="n">fred</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span><span class="n">DATA</span> <span class="o">/</span> <span class="s2">"fred_rates.csv"</span><span class="p">,</span> <span class="n">parse_dates</span><span class="o">=</span><span class="p">[</span><span class="s2">"date"</span><span class="p">])</span>
+<span class="n">spy_tbl</span> <span class="o">=</span> <span class="n">prices</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">prices</span><span class="o">.</span><span class="n">ticker</span> <span class="o">==</span> <span class="s2">"SPY"</span><span class="p">,</span> <span class="p">[</span><span class="s2">"date"</span><span class="p">,</span> <span class="s2">"adj_close"</span><span class="p">]]</span>
+<span class="n">m1</span> <span class="o">=</span> <span class="n">spy_tbl</span><span class="o">.</span><span class="n">merge</span><span class="p">(</span><span class="n">fred</span><span class="p">,</span> <span class="n">on</span><span class="o">=</span><span class="s2">"date"</span><span class="p">,</span> <span class="n">how</span><span class="o">=</span><span class="s2">"left"</span><span class="p">)</span>         <span class="c1"># keep every SPY day</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">m1</span><span class="o">.</span><span class="n">tail</span><span class="p">(</span><span class="mi">3</span><span class="p">))</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">"how='left' keeps"</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">m1</span><span class="p">),</span> <span class="s2">"rows; how='inner' keeps"</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">spy_tbl</span><span class="o">.</span><span class="n">merge</span><span class="p">(</span><span class="n">fred</span><span class="p">,</span> <span class="n">on</span><span class="o">=</span><span class="s2">"date"</span><span class="p">)))</span>
+</code></pre>
+<pre class="out">           date  adj_close  DGS3MO  DGS10  VIXCLS
+3980 2025-10-29   680.0531    3.93   4.08   16.92
+3981 2025-10-30   672.5738    3.92   4.11   16.91
+3982 2025-10-31   674.7800    3.89   4.11   17.44
+how=&#x27;left&#x27; keeps 3983 rows; how=&#x27;inner&#x27; keeps 3983</pre>
+<p>The <strong>join type</strong> decides what happens to rows without a partner: <code>inner</code> keeps only matches, <code>left</code> keeps all rows of the left table, <code>outer</code> keeps everything. Always check row counts after a merge; a key that is accidentally duplicated multiplies rows silently.</p>
+<p><code>pd.concat</code> stacks tables vertically (more rows) or side by side (<code>axis=1</code>), aligning on the index:</p>
+<pre class="code"><code><span class="n">part1</span><span class="p">,</span> <span class="n">part2</span> <span class="o">=</span> <span class="n">close</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="s2">"2024-12"</span><span class="p">],</span> <span class="n">close</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="s2">"2025-01"</span><span class="p">]</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">pd</span><span class="o">.</span><span class="n">concat</span><span class="p">([</span><span class="n">part1</span><span class="p">,</span> <span class="n">part2</span><span class="p">])</span><span class="o">.</span><span class="n">shape</span><span class="p">,</span> <span class="n">pd</span><span class="o">.</span><span class="n">concat</span><span class="p">([</span><span class="n">close</span><span class="p">[</span><span class="s2">"SPY"</span><span class="p">],</span> <span class="n">close</span><span class="p">[</span><span class="s2">"TLT"</span><span class="p">]],</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span>
+</code></pre>
+<pre class="out">(41, 10) (3983, 2)</pre>
+<h3 id="merge-asof-the-point-in-time-join"><code>merge_asof</code>: the point-in-time join</h3>
+<p>Economic data is released with a delay. If inflation for March is published on 10 April, a backtest may use it only from 10 April. <code>merge_asof</code> joins each row to the <strong>most recent</strong> row of the other table at or before its date, which is exactly “what was known at the time”.</p>
+<pre class="code"><code><span class="n">releases</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">({</span>
+    <span class="s2">"date"</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">to_datetime</span><span class="p">([</span><span class="s2">"2025-03-12"</span><span class="p">,</span> <span class="s2">"2025-04-10"</span><span class="p">,</span> <span class="s2">"2025-05-13"</span><span class="p">]),</span>
+    <span class="s2">"cpi_yoy"</span><span class="p">:</span> <span class="p">[</span><span class="mf">2.8</span><span class="p">,</span> <span class="mf">2.4</span><span class="p">,</span> <span class="mf">2.3</span><span class="p">],</span>                     <span class="c1"># announced on these dates</span>
+<span class="p">})</span>
+<span class="n">days</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">({</span><span class="s2">"date"</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">bdate_range</span><span class="p">(</span><span class="s2">"2025-04-08"</span><span class="p">,</span> <span class="s2">"2025-04-14"</span><span class="p">)})</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">pd</span><span class="o">.</span><span class="n">merge_asof</span><span class="p">(</span><span class="n">days</span><span class="p">,</span> <span class="n">releases</span><span class="p">,</span> <span class="n">on</span><span class="o">=</span><span class="s2">"date"</span><span class="p">,</span> <span class="n">direction</span><span class="o">=</span><span class="s2">"backward"</span><span class="p">))</span>
+</code></pre>
+<pre class="out">        date  cpi_yoy
+0 2025-04-08      2.8
+1 2025-04-09      2.8
+2 2025-04-10      2.4
+3 2025-04-11      2.4
+4 2025-04-14      2.4</pre>
+<h2 id="performance-and-good-style">Performance and good style</h2>
+<h3 id="vectorise-instead-of-apply-and-loops">Vectorise instead of <code>apply</code> and loops</h3>
+<pre class="code"><code><span class="kn">import</span><span class="w"> </span><span class="nn">time</span>
+<span class="n">x</span> <span class="o">=</span> <span class="n">prices</span><span class="p">[</span><span class="s2">"ret"</span><span class="p">]</span><span class="o">.</span><span class="n">fillna</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+<span class="n">t0</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">perf_counter</span><span class="p">();</span> <span class="n">slow</span> <span class="o">=</span> <span class="n">x</span><span class="o">.</span><span class="n">apply</span><span class="p">(</span><span class="k">lambda</span> <span class="n">v</span><span class="p">:</span> <span class="nb">max</span><span class="p">(</span><span class="n">v</span><span class="p">,</span> <span class="mi">0</span><span class="p">));</span> <span class="n">t1</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">perf_counter</span><span class="p">()</span>
+<span class="n">fast</span> <span class="o">=</span> <span class="n">x</span><span class="o">.</span><span class="n">clip</span><span class="p">(</span><span class="n">lower</span><span class="o">=</span><span class="mi">0</span><span class="p">);</span> <span class="n">t2</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">perf_counter</span><span class="p">()</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"apply </span><span class="si">{</span><span class="mi">1000</span><span class="o">*</span><span class="p">(</span><span class="n">t1</span><span class="o">-</span><span class="n">t0</span><span class="p">)</span><span class="si">:</span><span class="s2">.1f</span><span class="si">}</span><span class="s2"> ms vs clip </span><span class="si">{</span><span class="mi">1000</span><span class="o">*</span><span class="p">(</span><span class="n">t2</span><span class="o">-</span><span class="n">t1</span><span class="p">)</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2"> ms, equal: </span><span class="si">{</span><span class="n">slow</span><span class="o">.</span><span class="n">equals</span><span class="p">(</span><span class="n">fast</span><span class="p">)</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+<span class="n">R</span><span class="p">[</span><span class="s2">"apply_ratio"</span><span class="p">]</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="p">(</span><span class="n">t1</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="n">t0</span><span class="p">)</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="p">(</span><span class="n">t2</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="n">t1</span><span class="p">)</span><span class="si">:</span><span class="s2">.0f</span><span class="si">}</span><span class="s2">"</span>
+</code></pre>
+<pre class="out">apply 9.4 ms vs clip 0.88 ms, equal: True</pre>
+<p>The vectorised method was about 11 times faster. <code>apply</code> with a Python function runs a Python call per row; methods such as <code>clip</code>, <code>where</code>, <code>rolling</code>, <code>rank</code> and arithmetic run in compiled code.</p>
+<h3 id="method-chaining">Method chaining</h3>
+<p>Building a result as a chain of small steps, each returning a new DataFrame, reads top to bottom like a recipe and avoids half-modified intermediate variables. <code>assign</code> adds columns, <code>pipe</code> applies your own function.</p>
+<pre class="code"><code><span class="k">def</span><span class="w"> </span><span class="nf">annualise</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">periods</span><span class="o">=</span><span class="mi">252</span><span class="p">):</span>
+    <span class="k">return</span> <span class="n">df</span><span class="o">.</span><span class="n">assign</span><span class="p">(</span><span class="n">ann_vol</span><span class="o">=</span><span class="n">df</span><span class="p">[</span><span class="s2">"vol"</span><span class="p">]</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">periods</span><span class="p">))</span>
+
+<span class="n">summary</span> <span class="o">=</span> <span class="p">(</span>
+    <span class="n">prices</span>
+    <span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="k">lambda</span> <span class="n">d</span><span class="p">:</span> <span class="n">d</span><span class="p">[</span><span class="s2">"date"</span><span class="p">]</span> <span class="o">&gt;=</span> <span class="s2">"2020-01-01"</span><span class="p">]</span>
+    <span class="o">.</span><span class="n">groupby</span><span class="p">(</span><span class="s2">"ticker"</span><span class="p">,</span> <span class="n">as_index</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+    <span class="o">.</span><span class="n">agg</span><span class="p">(</span><span class="n">vol</span><span class="o">=</span><span class="p">(</span><span class="s2">"ret"</span><span class="p">,</span> <span class="s2">"std"</span><span class="p">),</span> <span class="n">last_price</span><span class="o">=</span><span class="p">(</span><span class="s2">"close"</span><span class="p">,</span> <span class="s2">"last"</span><span class="p">))</span>
+    <span class="o">.</span><span class="n">pipe</span><span class="p">(</span><span class="n">annualise</span><span class="p">)</span>
+    <span class="o">.</span><span class="n">sort_values</span><span class="p">(</span><span class="s2">"ann_vol"</span><span class="p">)</span>
+<span class="p">)</span>
+<span class="n">summary</span>
+</code></pre>
+<div class="out df"><div>
+
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th>ticker</th>
+      <th>vol</th>
+      <th>last_price</th>
+      <th>ann_vol</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th>2</th>
+      <td>GLD</td>
+      <td>0.0103</td>
+      <td>368.12</td>
+      <td>0.1627</td>
+    </tr>
+    <tr>
+      <th>8</th>
+      <td>TLT</td>
+      <td>0.0109</td>
+      <td>90.29</td>
+      <td>0.1730</td>
+    </tr>
+    <tr>
+      <th>4</th>
+      <td>KO</td>
+      <td>0.0129</td>
+      <td>68.90</td>
+      <td>0.2043</td>
+    </tr>
+    <tr>
+      <th>7</th>
+      <td>SPY</td>
+      <td>0.0132</td>
+      <td>682.06</td>
+      <td>0.2094</td>
+    </tr>
+    <tr>
+      <th>1</th>
+      <td>EEM</td>
+      <td>0.0138</td>
+      <td>55.30</td>
+      <td>0.2191</td>
+    </tr>
+    <tr>
+      <th>6</th>
+      <td>QQQ</td>
+      <td>0.0161</td>
+      <td>629.07</td>
+      <td>0.2550</td>
+    </tr>
+    <tr>
+      <th>5</th>
+      <td>MSFT</td>
+      <td>0.0188</td>
+      <td>517.81</td>
+      <td>0.2978</td>
+    </tr>
+    <tr>
+      <th>3</th>
+      <td>JPM</td>
+      <td>0.0199</td>
+      <td>311.12</td>
+      <td>0.3157</td>
+    </tr>
+    <tr>
+      <th>0</th>
+      <td>AAPL</td>
+      <td>0.0203</td>
+      <td>270.37</td>
+      <td>0.3217</td>
+    </tr>
+    <tr>
+      <th>9</th>
+      <td>XOM</td>
+      <td>0.0209</td>
+      <td>114.36</td>
+      <td>0.3312</td>
+    </tr>
+  </tbody>
+</table>
+</div></div>
+<h3 id="memory-categories-and-file-formats">Memory: categories and file formats</h3>
+<pre class="code"><code><span class="n">mem_obj</span> <span class="o">=</span> <span class="n">prices</span><span class="p">[</span><span class="s2">"ticker"</span><span class="p">]</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">object</span><span class="p">)</span><span class="o">.</span><span class="n">memory_usage</span><span class="p">(</span><span class="n">deep</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="n">mem_cat</span> <span class="o">=</span> <span class="n">prices</span><span class="p">[</span><span class="s2">"ticker"</span><span class="p">]</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="s2">"category"</span><span class="p">)</span><span class="o">.</span><span class="n">memory_usage</span><span class="p">(</span><span class="n">deep</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"ticker column: </span><span class="si">{</span><span class="n">mem_obj</span><span class="o">/</span><span class="mf">1e6</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2"> MB as Python strings, </span><span class="si">{</span><span class="n">mem_cat</span><span class="o">/</span><span class="mf">1e6</span><span class="si">:</span><span class="s2">.3f</span><span class="si">}</span><span class="s2"> MB as category"</span><span class="p">)</span>
+<span class="n">prices</span><span class="o">.</span><span class="n">to_parquet</span><span class="p">(</span><span class="s2">"prices.parquet"</span><span class="p">)</span>            <span class="c1"># columnar, typed, compressed</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">os</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"CSV </span><span class="si">{</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">getsize</span><span class="p">(</span><span class="n">DATA</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="s1">'prices_long.csv'</span><span class="p">)</span><span class="o">/</span><span class="mf">1e6</span><span class="si">:</span><span class="s2">.1f</span><span class="si">}</span><span class="s2"> MB vs Parquet </span><span class="si">{</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">getsize</span><span class="p">(</span><span class="s1">'prices.parquet'</span><span class="p">)</span><span class="o">/</span><span class="mf">1e6</span><span class="si">:</span><span class="s2">.1f</span><span class="si">}</span><span class="s2"> MB"</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">pd</span><span class="o">.</span><span class="n">read_parquet</span><span class="p">(</span><span class="s2">"prices.parquet"</span><span class="p">)</span><span class="o">.</span><span class="n">dtypes</span><span class="o">.</span><span class="n">head</span><span class="p">(</span><span class="mi">3</span><span class="p">))</span>
+<span class="n">os</span><span class="o">.</span><span class="n">remove</span><span class="p">(</span><span class="s2">"prices.parquet"</span><span class="p">)</span>
+</code></pre>
+<pre class="out">ticker column: 2.08 MB as Python strings, 0.040 MB as category</pre><pre class="out">CSV 2.3 MB vs Parquet 2.5 MB</pre><pre class="out">date      datetime64[us]
+ticker               str
+open             float64
+dtype: object</pre>
+<p>Parquet keeps the dtypes (dates stay dates), loads many times faster than CSV and is the standard format for research data. CSV is fine for sharing small files.</p>
+<h2 id="a-small-case-study-the-crash-of-march-2020">A small case study: the crash of March 2020</h2>
+<p>Everything together: select a window, compute drawdowns per asset, and see which assets protected a portfolio.</p>
+<pre class="code"><code><span class="n">window</span> <span class="o">=</span> <span class="n">close</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="s2">"2020-02-19"</span><span class="p">:</span><span class="s2">"2020-03-23"</span><span class="p">]</span>
+<span class="n">crash</span> <span class="o">=</span> <span class="p">(</span><span class="n">window</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">/</span> <span class="n">window</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span><span class="o">.</span><span class="n">sort_values</span><span class="p">()</span>
+<span class="n">worst_dd</span> <span class="o">=</span> <span class="p">(</span><span class="n">window</span> <span class="o">/</span> <span class="n">window</span><span class="o">.</span><span class="n">cummax</span><span class="p">()</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span><span class="o">.</span><span class="n">min</span><span class="p">()</span>
+<span class="n">corr_before</span> <span class="o">=</span> <span class="n">rets</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="s2">"2019"</span><span class="p">]</span><span class="o">.</span><span class="n">corr</span><span class="p">()[</span><span class="s2">"SPY"</span><span class="p">]</span>
+<span class="n">corr_during</span> <span class="o">=</span> <span class="n">rets</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="s2">"2020-02-19"</span><span class="p">:</span><span class="s2">"2020-03-23"</span><span class="p">]</span><span class="o">.</span><span class="n">corr</span><span class="p">()[</span><span class="s2">"SPY"</span><span class="p">]</span>
+<span class="n">table</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">({</span><span class="s2">"return"</span><span class="p">:</span> <span class="n">crash</span><span class="p">,</span> <span class="s2">"max drawdown"</span><span class="p">:</span> <span class="n">worst_dd</span><span class="p">,</span>
+                      <span class="s2">"corr with SPY 2019"</span><span class="p">:</span> <span class="n">corr_before</span><span class="p">,</span> <span class="s2">"corr during crash"</span><span class="p">:</span> <span class="n">corr_during</span><span class="p">})</span><span class="o">.</span><span class="n">sort_values</span><span class="p">(</span><span class="s2">"return"</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">table</span><span class="o">.</span><span class="n">round</span><span class="p">(</span><span class="mi">2</span><span class="p">))</span>
+<span class="n">R</span><span class="p">[</span><span class="s2">"tlt_crash"</span><span class="p">]</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">crash</span><span class="p">[</span><span class="s1">'TLT'</span><span class="p">]</span><span class="si">:</span><span class="s2">+.0%</span><span class="si">}</span><span class="s2">"</span>
+<span class="n">R</span><span class="p">[</span><span class="s2">"spy_crash"</span><span class="p">]</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">crash</span><span class="p">[</span><span class="s1">'SPY'</span><span class="p">]</span><span class="si">:</span><span class="s2">+.0%</span><span class="si">}</span><span class="s2">"</span>
+</code></pre>
+<pre class="out">        return  max drawdown  corr with SPY 2019  corr during crash
+ticker                                                             
+XOM      -0.48         -0.48                0.64               0.89
+JPM      -0.43         -0.43                0.70               0.93
+KO       -0.37         -0.37                0.33               0.85
+SPY      -0.34         -0.34                1.00               1.00
+EEM      -0.31         -0.31                0.76               0.93
+AAPL     -0.31         -0.31                0.74               0.97
+QQQ      -0.28         -0.29                0.95               0.98
+MSFT     -0.27         -0.28                0.81               0.96
+GLD      -0.04         -0.13               -0.27              -0.01
+TLT       0.14         -0.16               -0.46              -0.50</pre>
+<p>From 19 February to 23 March 2020 SPY moved -34% while long Treasuries moved +14%. Notice how the correlations of the stocks with SPY rose during the crash: diversification across stocks weakens exactly when you need it.</p>
+<h2 id="the-mistakes-that-cost-quants-money">The mistakes that cost quants money</h2>
+<table>
+<thead>
+<tr>
+<th>Mistake</th>
+<th>What happens</th>
+<th>Fix</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Using <code>close</code> instead of <code>adj_close</code></td>
+<td>Dividends and splits distort returns</td>
+<td>Use adjusted prices for returns</td>
+</tr>
+<tr>
+<td><code>pct_change</code>/<code>shift</code> on long data without <code>groupby</code></td>
+<td>Returns across different tickers</td>
+<td><code>groupby("ticker")</code> first</td>
+</tr>
+<tr>
+<td><code>shift(-1)</code> or <code>bfill</code> in features</td>
+<td>Look-ahead bias, fake profits</td>
+<td>Features use only <code>shift(k ≥ 0)</code>, <code>ffill</code></td>
+</tr>
+<tr>
+<td>Chained assignment <code>df[m]["c"] = v</code></td>
+<td>Nothing changes</td>
+<td><code>df.loc[m, "c"] = v</code></td>
+</tr>
+<tr>
+<td>Merge with duplicated keys</td>
+<td>Rows multiply silently</td>
+<td>Check <code>len</code> before and after; <code>validate="one_to_one"</code></td>
+</tr>
+<tr>
+<td>Forgetting <code>NaN</code> alignment</td>
+<td>Statistics on fewer days than you think</td>
+<td>Check <code>.count()</code>, decide <code>dropna</code>/<code>ffill</code></td>
+</tr>
+<tr>
+<td>Dates as strings</td>
+<td>No resampling, wrong sorting</td>
+<td><code>parse_dates</code>, <code>pd.to_datetime</code></td>
+</tr>
+<tr>
+<td><code>apply</code> with a lambda on big data</td>
+<td>10–100× slower</td>
+<td>Vectorised methods</td>
+</tr>
+</tbody>
+</table>
+<h2 id="exercises">Exercises</h2>
+<div class="box exercise">
+<p class="lab">Try it</p>
+<ol>
+<li>From <code>prices</code>, build a wide table of daily <strong>volumes</strong> and find, for each ticker, the date of its highest volume.</li>
+<li>Compute each asset's annual returns for 2015–2024 from <code>close</code> with <code>resample</code>, and the number of years each asset beat SPY.</li>
+<li>Compute the rolling 1-year beta of AAPL to SPY: $\beta = \text{Cov}(r_A, r_M) / \text{Var}(r_M)$ with <code>rolling(252)</code>. When was it highest?</li>
+<li>Create a column <code>next_ret</code> with each ticker's <em>next-day</em> return (the target), and check, using <code>corr</code>, whether today's return predicts tomorrow's for SPY. Be careful about which shift goes where.</li>
+<li>For each calendar month name (January, February, …), compute the average SPY monthly return across years. Is there a “best month”? How many years back each average?</li>
+<li>Use <code>merge_asof</code> to attach to every SPY trading day the latest <strong>weekly</strong> close of GLD known at that date.</li>
+</ol>
+</div>
+<details><summary>Solutions</summary>
+<pre class="code"><code><span class="c1"># 1</span>
+<span class="n">vol_wide</span> <span class="o">=</span> <span class="n">prices</span><span class="o">.</span><span class="n">pivot</span><span class="p">(</span><span class="n">index</span><span class="o">=</span><span class="s2">"date"</span><span class="p">,</span> <span class="n">columns</span><span class="o">=</span><span class="s2">"ticker"</span><span class="p">,</span> <span class="n">values</span><span class="o">=</span><span class="s2">"volume"</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">vol_wide</span><span class="o">.</span><span class="n">idxmax</span><span class="p">()</span><span class="o">.</span><span class="n">dt</span><span class="o">.</span><span class="n">date</span><span class="p">)</span>
+
+<span class="c1"># 2</span>
+<span class="n">ann</span> <span class="o">=</span> <span class="n">close</span><span class="o">.</span><span class="n">resample</span><span class="p">(</span><span class="s2">"YE"</span><span class="p">)</span><span class="o">.</span><span class="n">last</span><span class="p">()</span><span class="o">.</span><span class="n">pct_change</span><span class="p">(</span><span class="n">fill_method</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="s2">"2015"</span><span class="p">:</span><span class="s2">"2024"</span><span class="p">]</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">ann</span><span class="o">.</span><span class="n">gt</span><span class="p">(</span><span class="n">ann</span><span class="p">[</span><span class="s2">"SPY"</span><span class="p">],</span> <span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span><span class="o">.</span><span class="n">drop</span><span class="p">(</span><span class="s2">"SPY"</span><span class="p">))</span>
+
+<span class="c1"># 3</span>
+<span class="n">cov</span> <span class="o">=</span> <span class="n">rets</span><span class="p">[</span><span class="s2">"AAPL"</span><span class="p">]</span><span class="o">.</span><span class="n">rolling</span><span class="p">(</span><span class="mi">252</span><span class="p">)</span><span class="o">.</span><span class="n">cov</span><span class="p">(</span><span class="n">rets</span><span class="p">[</span><span class="s2">"SPY"</span><span class="p">])</span>
+<span class="n">beta</span> <span class="o">=</span> <span class="n">cov</span> <span class="o">/</span> <span class="n">rets</span><span class="p">[</span><span class="s2">"SPY"</span><span class="p">]</span><span class="o">.</span><span class="n">rolling</span><span class="p">(</span><span class="mi">252</span><span class="p">)</span><span class="o">.</span><span class="n">var</span><span class="p">()</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"highest beta </span><span class="si">{</span><span class="n">beta</span><span class="o">.</span><span class="n">max</span><span class="p">()</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2"> on </span><span class="si">{</span><span class="n">beta</span><span class="o">.</span><span class="n">idxmax</span><span class="p">()</span><span class="o">.</span><span class="n">date</span><span class="p">()</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+
+<span class="c1"># 4</span>
+<span class="n">prices</span><span class="p">[</span><span class="s2">"next_ret"</span><span class="p">]</span> <span class="o">=</span> <span class="n">prices</span><span class="o">.</span><span class="n">groupby</span><span class="p">(</span><span class="s2">"ticker"</span><span class="p">)[</span><span class="s2">"ret"</span><span class="p">]</span><span class="o">.</span><span class="n">shift</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span>     <span class="c1"># target only!</span>
+<span class="n">spy_rows</span> <span class="o">=</span> <span class="n">prices</span><span class="p">[</span><span class="n">prices</span><span class="o">.</span><span class="n">ticker</span> <span class="o">==</span> <span class="s2">"SPY"</span><span class="p">]</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">"corr(today, tomorrow) for SPY:"</span><span class="p">,</span> <span class="nb">round</span><span class="p">(</span><span class="n">spy_rows</span><span class="p">[</span><span class="s2">"ret"</span><span class="p">]</span><span class="o">.</span><span class="n">corr</span><span class="p">(</span><span class="n">spy_rows</span><span class="p">[</span><span class="s2">"next_ret"</span><span class="p">]),</span> <span class="mi">3</span><span class="p">))</span>
+
+<span class="c1"># 5</span>
+<span class="n">sm</span> <span class="o">=</span> <span class="n">monthly_ret</span><span class="p">[</span><span class="s2">"SPY"</span><span class="p">]</span><span class="o">.</span><span class="n">dropna</span><span class="p">()</span>
+<span class="n">by_month</span> <span class="o">=</span> <span class="n">sm</span><span class="o">.</span><span class="n">groupby</span><span class="p">(</span><span class="n">sm</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">month_name</span><span class="p">())</span><span class="o">.</span><span class="n">agg</span><span class="p">([</span><span class="s2">"mean"</span><span class="p">,</span> <span class="s2">"count"</span><span class="p">])</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">by_month</span><span class="o">.</span><span class="n">sort_values</span><span class="p">(</span><span class="s2">"mean"</span><span class="p">,</span> <span class="n">ascending</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span><span class="o">.</span><span class="n">round</span><span class="p">(</span><span class="mi">4</span><span class="p">)</span><span class="o">.</span><span class="n">head</span><span class="p">(</span><span class="mi">4</span><span class="p">))</span>
+
+<span class="c1"># 6</span>
+<span class="n">gld_w</span> <span class="o">=</span> <span class="n">close</span><span class="p">[</span><span class="s2">"GLD"</span><span class="p">]</span><span class="o">.</span><span class="n">resample</span><span class="p">(</span><span class="s2">"W-FRI"</span><span class="p">)</span><span class="o">.</span><span class="n">last</span><span class="p">()</span><span class="o">.</span><span class="n">rename</span><span class="p">(</span><span class="s2">"gld_weekly"</span><span class="p">)</span><span class="o">.</span><span class="n">reset_index</span><span class="p">()</span>
+<span class="n">spy_days</span> <span class="o">=</span> <span class="n">close</span><span class="p">[</span><span class="s2">"SPY"</span><span class="p">]</span><span class="o">.</span><span class="n">reset_index</span><span class="p">()</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">pd</span><span class="o">.</span><span class="n">merge_asof</span><span class="p">(</span><span class="n">spy_days</span><span class="p">,</span> <span class="n">gld_w</span><span class="p">,</span> <span class="n">on</span><span class="o">=</span><span class="s2">"date"</span><span class="p">)</span><span class="o">.</span><span class="n">tail</span><span class="p">(</span><span class="mi">3</span><span class="p">))</span>
+</code></pre>
+<pre class="out">ticker
+AAPL    2011-01-18
+EEM     2010-05-06
+GLD     2013-04-15
+JPM     2012-05-11
+KO      2012-09-21
+MSFT    2011-04-29
+QQQ     2010-05-07
+SPY     2011-08-09
+TLT     2025-04-09
+XOM     2010-06-25
+dtype: object
+ticker
+AAPL    7
+EEM     1
+GLD     4
+JPM     7
+KO      3
+MSFT    8
+QQQ     7
+TLT     1
+XOM     3
+dtype: int64
+highest beta 1.59 on 2021-07-19
+corr(today, tomorrow) for SPY: -0.105
+            mean  count
+date                   
+November  0.0328     15
+July      0.0296     16
+October   0.0227     16
+January   0.0135     15
+           date       SPY  gld_weekly
+3980 2025-10-29  680.0531      377.52
+3981 2025-10-30  672.5738      377.52
+3982 2025-10-31  674.7800      368.12</pre>
+</details>
+<h2 id="whats-next">What's next</h2>
+<p>You can now load, clean, reshape and analyse a market dataset. Toolkit Chapter 3 turns those tables into clear charts, from a single line plot to a full market report, and finishes the toolkit.</p>
+    <nav class="pager">
+      <a class="prev" href="../01-numpy-from-zero/index.html"><small>Previous</small>Toolkit 1 · NumPy from Zero</a>
+      <a class="next" href="../03-plotting-from-zero/index.html"><small>Next</small>Toolkit 3 · Plotting from Zero</a>
+    </nav>
+  </main>
+</div>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.js"></script>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/contrib/auto-render.min.js"></script>
+<script defer src="../../assets/guide.js"></script>
+</body>
+</html>

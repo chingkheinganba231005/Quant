@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>pandas Playground</title>
+<style>
+:root{--bg:#fff;--ink:#1d2128;--muted:#5d6470;--line:#d9d6cc;--cell:#f4f2ec;--on:#0f6b5c;--on-ink:#fff;--hot:#e08a2c;--bad:#c8372d;--soft:#e2f1ed;--g1:#dbe8fb;--g2:#fbe4d2;--g3:#e5f3dc;color-scheme:light}
+:root[data-theme=dark]{--bg:#181c22;--ink:#e7e9ee;--muted:#a2a9b6;--line:#2e343e;--cell:#232932;--on:#4fc7ad;--on-ink:#0c1512;--hot:#f0a75a;--bad:#f2786e;--soft:#16302b;--g1:#1c2a44;--g2:#3a2718;--g3:#1d3222;color-scheme:dark}
+@media (prefers-color-scheme:dark){:root:not([data-theme=light]){--bg:#181c22;--ink:#e7e9ee;--muted:#a2a9b6;--line:#2e343e;--cell:#232932;--on:#4fc7ad;--on-ink:#0c1512;--hot:#f0a75a;--bad:#f2786e;--soft:#16302b;--g1:#1c2a44;--g2:#3a2718;--g3:#1d3222;color-scheme:dark}}
+*{box-sizing:border-box}body{margin:0;padding:14px 16px;background:var(--bg);color:var(--ink);font:15px/1.5 Inter,system-ui,sans-serif}
+.tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
+button{font:inherit;border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:999px;padding:6px 14px;cursor:pointer}
+button.on{background:var(--on);border-color:var(--on);color:var(--on-ink)}
+.pane{display:none}.pane.on{display:block}
+table{border-collapse:collapse;font:13.5px ui-monospace,Menlo,monospace;margin:6px 0}
+th,td{border:1px solid var(--line);padding:4px 9px;text-align:right;transition:background .3s}
+th{background:var(--cell);font-weight:600}
+td.on{background:var(--on);color:var(--on-ink)}td.hot{background:var(--hot);color:#111}td.na{color:var(--muted);font-style:italic}td.bad{background:color-mix(in srgb,var(--bad) 25%,transparent)}
+td.g1{background:var(--g1)}td.g2{background:var(--g2)}td.g3{background:var(--g3)}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:6px 0}
+.flex{display:flex;gap:22px;flex-wrap:wrap;align-items:flex-start}
+.msg{font:13.5px ui-monospace,Menlo,monospace;background:var(--soft);border-radius:8px;padding:8px 12px;margin-top:8px;white-space:pre-wrap}
+.lbl{font:600 12px Inter,sans-serif;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+input[type=range]{width:180px}
+.arrow{font-size:26px;align-self:center;color:var(--muted)}
+</style></head><body>
+<div class="tabs"><button class="on" data-t="shift">Shift</button><button data-t="roll">Rolling</button><button data-t="gb">Groupby</button><button data-t="rs">Reshape</button></div>
+
+<section class="pane on" id="shift">
+  <div class="row"><span>Signal: <b>buy if today’s return &gt; 0</b>. Shift it by</span><button data-s="1" class="on">shift(1): trade tomorrow ✓</button><button data-s="0">no shift</button><button data-s="-1">shift(-1): look-ahead ✗</button></div>
+  <div id="stab"></div><div class="msg" id="smsg"></div>
+</section>
+
+<section class="pane" id="roll">
+  <div class="row"><label>window <input type="range" id="win" min="2" max="6" value="3"></label><b id="winv">3</b><label>row <input type="range" id="pos" min="0" max="11" value="5"></label><button id="rplay">▶ slide</button><label><input type="checkbox" id="minp"> min_periods=1</label></div>
+  <div id="rtab"></div><div class="msg" id="rmsg"></div>
+</section>
+
+<section class="pane" id="gb">
+  <div class="row"><span><code>df.groupby("ticker")["ret"]</code></span><button data-g="mean" class="on">.mean()</button><button data-g="transform">.transform("mean")</button><button data-g="rank">rank by date</button><button id="gplay">▶ split → apply → combine</button></div>
+  <div class="flex" id="gwrap"></div><div class="msg" id="gmsg"></div>
+</section>
+
+<section class="pane" id="rs">
+  <div class="row"><button data-r="pivot" class="on">pivot(index="date", columns="ticker")</button><button data-r="melt">melt(id_vars="date")</button></div>
+  <div class="flex" id="rwrap"></div><div class="msg" id="rsmsg"></div>
+</section>
+
+<script>
+try{var pt=parent.document.documentElement.dataset.theme;if(pt)document.documentElement.dataset.theme=pt}catch(e){}
+document.querySelectorAll('.tabs button').forEach(function(b){b.onclick=function(){document.querySelectorAll('.tabs button').forEach(function(x){x.classList.toggle('on',x===b)});document.querySelectorAll('.pane').forEach(function(p){p.classList.toggle('on',p.id===b.dataset.t)})}});
+function f(x,d){return x===null||isNaN(x)?'NaN':x.toFixed(d===undefined?2:d)}
+function tbl(head,rows,cls){var h='<table><tr>'+head.map(function(x){return '<th>'+x+'</th>'}).join('')+'</tr>';rows.forEach(function(r,i){h+='<tr>'+r.map(function(c,j){var k=cls?cls(i,j,c):'';if(c==='NaN')k+=' na';return '<td class="'+k+'">'+c+'</td>'}).join('')+'</tr>'});return h+'</table>'}
+/* ---- shift ---- */
+var D=['Mon','Tue','Wed','Thu','Fri','Mon','Tue','Wed'],RT=[0.8,-0.5,1.2,0.4,-0.9,-0.3,0.7,0.2],sh=1;
+function drawShift(){var sig=RT.map(function(r){return r>0?1:0}),pos=RT.map(function(_,i){var k=i-sh;return k>=0&&k<RT.length?sig[k]:null});
+ var pnl=RT.map(function(r,i){return pos[i]===null?null:pos[i]*r}),tot=pnl.reduce(function(s,x){return s+(x||0)},0);
+ var rows=D.map(function(d,i){return [d,f(RT[i],1)+'%',sig[i],pos[i]===null?'NaN':pos[i],pnl[i]===null?'NaN':f(pnl[i],1)+'%']});
+ document.getElementById('stab').innerHTML=tbl(['day','return','signal','position = signal.shift('+sh+')','P&L'],rows,function(i,j){if(j===3&&pos[i]!==null&&sh<0)return 'bad';if(j===3&&pos[i]===1)return 'on';return ''});
+ var m={1:'shift(1): on each day you hold what yesterday’s signal said. Honest: total P&L '+f(tot,1)+'%.',0:'no shift: you trade on today’s return using today’s close. You could not know it before the close: P&L '+f(tot,1)+'% is not achievable.',
+ '-1':'shift(-1): you use TOMORROW’s return to decide today. Look-ahead bias: P&L '+f(tot,1)+'% is fake. Every “amazing” backtest bug looks like this.'};
+ document.getElementById('smsg').textContent=m[sh]}
+document.querySelectorAll('[data-s]').forEach(function(b){b.onclick=function(){sh=+b.dataset.s;document.querySelectorAll('[data-s]').forEach(function(x){x.classList.toggle('on',x===b)});drawShift()}});drawShift();
+/* ---- rolling ---- */
+var P=[100,102,101,104,107,105,108,111,109,112,115,113],rt=null;
+function drawRoll(){var w=+document.getElementById('win').value,p=+document.getElementById('pos').value,mp=document.getElementById('minp').checked;document.getElementById('winv').textContent=w;
+ var ma=P.map(function(_,i){var lo=Math.max(0,i-w+1),n=i-lo+1;if(n<w&&!mp)return null;var s=0;for(var k=lo;k<=i;k++)s+=P[k];return s/n});
+ var rows=P.map(function(x,i){return ['t'+i,x,ma[i]===null?'NaN':f(ma[i])]});
+ document.getElementById('rtab').innerHTML=tbl(['row','price','rolling('+w+').mean()'],rows,function(i,j){if(j===1&&i<=p&&i>p-w)return 'on';if(j===2&&i===p)return 'hot';return ''});
+ document.getElementById('rmsg').textContent='row t'+p+': mean of the '+Math.min(w,p+1)+' price(s) ending at t'+p+' = '+(ma[p]===null?'NaN (window not full yet)':f(ma[p]))+'\nOnly the current and PAST rows are used: rolling windows never look ahead.'}
+['win','pos','minp'].forEach(function(id){document.getElementById(id).oninput=drawRoll});
+document.getElementById('rplay').onclick=function(){clearInterval(rt);var p=0;document.getElementById('pos').value=0;drawRoll();rt=setInterval(function(){p++;if(p>11){clearInterval(rt);return}document.getElementById('pos').value=p;drawRoll()},600)};drawRoll();
+/* ---- groupby ---- */
+var G=[['d1','AAPL',1.2],['d1','KO',0.3],['d1','SPY',0.6],['d2','AAPL',-0.8],['d2','KO',0.1],['d2','SPY',-0.4],['d3','AAPL',2.0],['d3','KO',-0.2],['d3','SPY',0.9]],gm='mean',gstep=3,gt=null;
+var COL={AAPL:'g1',KO:'g2',SPY:'g3',d1:'g1',d2:'g2',d3:'g3'};
+function drawGb(){var key=gm==='rank'?0:1,w=document.getElementById('gwrap'),groups={};G.forEach(function(r){(groups[r[key]]=groups[r[key]]||[]).push(r)});
+ var h='<div><div class="lbl">df</div>'+tbl(['date','ticker','ret'],G.map(function(r){return [r[0],r[1],f(r[2],1)]}),function(i){return gstep>=1?COL[G[i][key]]:''})+'</div>';
+ if(gstep>=1){h+='<div class="arrow">→</div><div><div class="lbl">1 · split by '+(key?'ticker':'date')+'</div>';Object.keys(groups).forEach(function(k){h+=tbl([k],groups[k].map(function(r){return [f(r[2],1)]}),function(){return COL[k]})});h+='</div>'}
+ if(gstep>=2){h+='<div class="arrow">→</div><div><div class="lbl">2 · apply</div>';Object.keys(groups).forEach(function(k){var v=groups[k].map(function(r){return r[2]});if(gm==='rank'){var s=v.slice().sort(function(a,b){return b-a});h+=tbl([k+' rank'],v.map(function(x){return [s.indexOf(x)+1]}),function(){return COL[k]})}else h+=tbl([k+' mean'],[[f(v.reduce(function(a,b){return a+b})/v.length)]],function(){return COL[k]})});h+='</div>'}
+ if(gstep>=3){h+='<div class="arrow">→</div><div><div class="lbl">3 · combine</div>';
+  if(gm==='mean')h+=tbl(['ticker','ret'],Object.keys(groups).map(function(k){var v=groups[k].map(function(r){return r[2]});return [k,f(v.reduce(function(a,b){return a+b})/v.length)]}),function(i){return COL[Object.keys(groups)[i]]});
+  else if(gm==='transform')h+=tbl(['date','ticker','mean'],G.map(function(r){var v=groups[r[1]].map(function(x){return x[2]});return [r[0],r[1],f(v.reduce(function(a,b){return a+b})/v.length)]}),function(i){return COL[G[i][1]]});
+  else h+=tbl(['date','ticker','rank'],G.map(function(r){var v=groups[r[0]].map(function(x){return x[2]}).sort(function(a,b){return b-a});return [r[0],r[1],v.indexOf(r[2])+1]}),function(i){return COL[G[i][0]]});h+='</div>'}
+ w.innerHTML=h;var m={mean:'.mean(): one row PER GROUP (3 rows). Use it for summary tables.',transform:'.transform("mean"): the group result is broadcast back to EVERY original row (9 rows, same index). Use it to add a group statistic as a column.',rank:'groupby("date")["ret"].rank(ascending=False): compare assets with each other on each date. 1 = best that day. This is the core of cross-sectional strategies.'};
+ document.getElementById('gmsg').textContent=['Step 0: the original long table.','Step 1 · split: rows are separated by key.','Step 2 · apply: the function runs on each group separately.','Step 3 · combine: '+m[gm]][gstep]}
+document.querySelectorAll('[data-g]').forEach(function(b){b.onclick=function(){gm=b.dataset.g;document.querySelectorAll('[data-g]').forEach(function(x){x.classList.toggle('on',x===b)});gstep=3;drawGb()}});
+document.getElementById('gplay').onclick=function(){clearInterval(gt);gstep=0;drawGb();gt=setInterval(function(){gstep++;drawGb();if(gstep>=3)clearInterval(gt)},1100)};drawGb();
+/* ---- reshape ---- */
+var L=[['d1','AAPL',270],['d1','KO',69],['d2','AAPL',268],['d2','KO',70],['d3','AAPL',272],['d3','KO',null]],rmode='pivot';
+function drawRs(){var w=document.getElementById('rwrap');var long=tbl(['date','ticker','close'],L.map(function(r){return [r[0],r[1],r[2]===null?'NaN':r[2]]}),function(i){return COL[L[i][0]]});
+ var wide=tbl(['date','AAPL','KO'],['d1','d2','d3'].map(function(d){var a=L.find(function(r){return r[0]===d&&r[1]==='AAPL'}),k=L.find(function(r){return r[0]===d&&r[1]==='KO'});return [d,a[2],k[2]===null?'NaN':k[2]]}),function(i){return COL['d'+(i+1)]});
+ w.innerHTML=rmode==='pivot'?'<div><div class="lbl">long (one row per date and ticker)</div>'+long+'</div><div class="arrow">→</div><div><div class="lbl">wide (one column per ticker)</div>'+wide+'</div>':'<div><div class="lbl">wide</div>'+wide+'</div><div class="arrow">→</div><div><div class="lbl">long</div>'+long+'</div>';
+ document.getElementById('rsmsg').textContent=rmode==='pivot'?'pivot: the values of "ticker" become column names, "date" becomes the index. Each (date, ticker) pair must appear only once, otherwise use pivot_table with an aggregation.':'melt: column names become values of a new "ticker" column. Long format is what databases store and what groupby likes; wide format is what you compute returns and correlations on.'}
+document.querySelectorAll('[data-r]').forEach(function(b){b.onclick=function(){rmode=b.dataset.r;document.querySelectorAll('[data-r]').forEach(function(x){x.classList.toggle('on',x===b)});drawRs()}});drawRs();
+</script></body></html>
