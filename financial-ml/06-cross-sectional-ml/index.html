@@ -32,6 +32,7 @@
 <li><a href="#momentum-crashes-and-volatility-scaling">Momentum crashes and volatility scaling</a></li>
 <li><a href="#does-the-edge-decay">Does the edge decay?</a></li>
 <li><a href="#present-your-solution">Present your solution</a></li>
+<li><a href="#launch-monitor-and-maintain">Launch, monitor and maintain</a></li>
 <li><a href="#try-it-out">Try it out</a></li>
 <li><a href="#exercises">Exercises</a></li>
 <li><a href="#whats-next">What's next</a></li></ol>
@@ -442,6 +443,13 @@ industry momentum IC: 0.077 before 1994 vs 0.039 after (publication of Jegadeesh
 <li><strong>Models.</strong> A composite with signs copied from the stock literature failed (Sharpe -0.05). Models that learned weights and signs from past data in a walk-forward (0.42 ridge, 0.41 LightGBM) worked, but did not beat volatility-scaled industry momentum (0.54), and their alphas after the four standard factors are not significant.</li>
 <li><strong>Why ML did not win here.</strong> With ICs of a few hundredths and 49 correlated assets (about 23 independent ones, Exercise 3), there is little that a flexible model can learn beyond the signs. ML earns its keep with many more assets (thousands of stocks), more varied inputs (fundamentals, analyst data, text) and careful validation, which is where the large quantitative equity funds use it.</li>
 <li><strong>Risks.</strong> Momentum crashes (use volatility scaling), decay after publication (the IC halved), crowding, and costs: industry portfolios are cheap to trade, individual small stocks are not.</li>
+</ul>
+<h2 id="launch-monitor-and-maintain">Launch, monitor and maintain</h2>
+<ul>
+<li><strong>Point-in-time data only.</strong> Every signal must be computed from data that was available at the rebalance date. In production that means storing the raw inputs you used each month, not recomputing history from today's (revised) database.</li>
+<li><strong>Track the live IC.</strong> Each month, record the rank correlation between the signal and the following month's returns. A single month means nothing (Chapter 1: the standard error of one month's IC across 49 assets is about 0.14); a rolling 36-month average falling to zero, or below, is a reason to review the signal.</li>
+<li><strong>Watch crowding and crash risk.</strong> Momentum's worst months come after market rebounds from bear markets. Keep the volatility scaling tested above, and cap gross exposure.</li>
+<li><strong>Re-train on schedule, not on drawdown.</strong> Refit the models every year with the same procedure as the walk-forward, and never because the strategy has just had a bad month: that is fitting to noise.</li>
 </ul>
 <h2 id="try-it-out">Try it out</h2>
 <div class="playground"><div class="pg-bar"><span>Interactive playground</span><a href="animations/factor_lab.html" target="_blank" rel="noopener">open full screen ↗</a></div><iframe src="animations/factor_lab.html" loading="lazy" style="height:640px" title="Interactive playground"></iframe></div>

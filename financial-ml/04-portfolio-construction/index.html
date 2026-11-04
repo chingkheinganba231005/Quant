@@ -31,6 +31,7 @@
 <li><a href="#portfolios-that-need-fewer-estimates">Portfolios that need fewer estimates</a></li>
 <li><a href="#the-walk-forward-test">The walk-forward test</a></li>
 <li><a href="#present-your-solution">Present your solution</a></li>
+<li><a href="#launch-monitor-and-maintain">Launch, monitor and maintain</a></li>
 <li><a href="#try-it-out">Try it out</a></li>
 <li><a href="#exercises">Exercises</a></li>
 <li><a href="#whats-next">What's next</a></li></ol>
@@ -469,6 +470,13 @@ HRP                          -34.6    -19.9 -52.6     -36.3 -19.6</pre>
 </tbody>
 </table>
 <p><strong>Recommendation.</strong> Over fifty years, the method that ignored expected returns completely and minimised risk (Sharpe 0.61) beat both 1/N (0.55) and the mean–variance optimiser (0.56), with a third less volatility and much smaller drawdowns in long bear markets. Its weakness is concentration (about four effective holdings), so in practice: use minimum variance with a shrunk covariance and weight caps if the goal is low risk, or HRP (Sharpe 0.59) if broad diversification matters; never feed raw sample means into an optimiser; and treat the predicted risk of optimised portfolios as optimistic. Expected returns should come from a separately validated model (Chapters 5 and 6), shrunk heavily towards zero, or from priors such as the Black–Litterman equilibrium (Exercise 4). Note how close the Sharpe ratios are: the differences between methods are smaller than the estimation error of a 50-year Sharpe ratio (about ±0.15), so robustness and risk, not the ranking, should decide.</p>
+<h2 id="launch-monitor-and-maintain">Launch, monitor and maintain</h2>
+<ul>
+<li><strong>Rebalance on a fixed calendar</strong> (monthly here) with the covariance estimated only from data available on the rebalance date, exactly as in the walk-forward. Log the inputs, the weights and the code version every time.</li>
+<li><strong>Monitor predicted against realised risk.</strong> Each quarter, compare the portfolio's realised volatility with the volatility the covariance model predicted. Optimised portfolios tend to under-predict their own risk; a ratio persistently above about 1.2 means the shrinkage is too weak or the window too short.</li>
+<li><strong>Watch concentration and turnover.</strong> Track the effective number of holdings (1 / Σw²) and the monthly turnover. A sudden collapse in the effective number of holdings usually means one asset's estimated variance has dropped, often because of a data problem.</li>
+<li><strong>Keep the weight caps</strong> you tested with. Lifting a cap in production changes the strategy you validated.</li>
+</ul>
 <h2 id="try-it-out">Try it out</h2>
 <div class="playground"><div class="pg-bar"><span>Interactive playground</span><a href="animations/frontier_lab.html" target="_blank" rel="noopener">open full screen ↗</a></div><iframe src="animations/frontier_lab.html" loading="lazy" style="height:760px" title="Interactive playground"></iframe></div>
 

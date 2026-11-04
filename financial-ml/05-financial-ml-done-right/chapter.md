@@ -238,6 +238,8 @@ Leakage hides in more places than the split: features computed on the whole samp
 
 ## Project: predicting SPY's direction honestly
 
+**The big picture.** *Objective:* predict whether SPY will hit a profit target before a stop-loss over the next few weeks, well enough to trade on it. *Measure:* the out-of-sample log loss, accuracy and AUC against the **base rate** (always predicting the more common label), using purged and embargoed cross-validation; then the Sharpe ratio of the trades the model would take. *Baseline to beat:* the base rate, and buy-and-hold. Writing these down *before* modelling is what stops you from moving the goalposts later.
+
 Now real data. Features: returns over five horizons, two volatilities and their ratio, the distance from the 200-day average, the drawdown from the one-year high, and three VIX features (level, 5-day change, and the gap between implied and realised volatility). Label: the triple-barrier label above. Weights: average uniqueness.
 
 ```python

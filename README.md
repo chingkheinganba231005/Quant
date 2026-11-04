@@ -46,6 +46,10 @@ python3 -m pip install -U jupyter numpy pandas matplotlib seaborn plotly scipy s
 jupyter notebook
 ```
 
-Each chapter folder contains `index.html` (the guide), a Jupyter notebook that reproduces every number and figure, `images/`, `datasets/` and `animations/` (interactive playgrounds). Guides and notebooks are generated from a single literate source, `chapter.md`, with `python3 tools/build.py <chapter-folder>`; the hub and this README with `python3 tools/hub.py`.
+Each chapter folder contains `index.html` (the guide), a Jupyter notebook that reproduces every number and figure, `images/`, `datasets/`, `animations/` (interactive playgrounds) and a `README.md` with its files and results. Guides and notebooks are generated from a single literate source, `chapter.md`, with `python3 tools/build.py <chapter-folder>`; the hub and this README with `python3 tools/hub.py`; the chapter READMEs with `python3 tools/readmes.py`.
+
+## How the projects are structured
+
+The project chapters follow the end-to-end workflow of Chapter 2 of *Hands-On Machine Learning* (as in the companion Romy and surrogate-modelling courses), adapted to trading: **look at the big picture** (objective, performance measure, assumptions), **get the data**, **explore** it, **build** and validate models without look-ahead, **fine-tune honestly** (walk-forward, purged cross-validation, multiple-testing checks), **present your solution** with its limitations, and **launch, monitor and maintain** it. Each chapter ends with an interactive playground and exercises with solutions.
 
 *Educational material, not investment advice.*

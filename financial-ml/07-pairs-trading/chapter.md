@@ -20,6 +20,12 @@ The idea is simple; doing it honestly is not. Two prices that wander together by
 Two dogs on one leash can run around the park in any direction, but they can never get far apart: when one pulls ahead, the leash drags it back. Two dogs without a leash may also run side by side for a while, by chance, but there is no reason for them to stay together. Pairs trading bets on the leash. The hard part is telling a leash from a coincidence.
 :::
 
+## Look at the big picture
+
+**The problem.** From a universe of related US stocks and ETFs, select pairs whose prices are tied together, trade the gap between them when it is unusually wide, and decide whether the profits survive outside the period in which the pairs were chosen. **The data:** daily adjusted prices since 2006, split into a formation period (2010–2017) used for every choice and a trading period (2018–2026) used only once. **Measures:** cointegration p-values in both periods, the out-of-sample Sharpe ratio after costs, the share of pairs that are profitable, and the correlation with the market (a relative-value strategy should be close to market-neutral).
+
+**Assumptions to check.** That the pairs found are not coincidences (multiple testing), that relationships persist (they may not), and that a hedge ratio fixed in the past stays valid (the Kalman filter tests that).
+
 ## Setup and data
 
 Daily adjusted prices since 2006 of 23 US stocks and ETFs chosen in related groups: soft drinks, oil majors, banks, home improvement, card networks, parcel delivery, restaurants, two commodity-exporting country ETFs (Australia and Canada), gold and gold miners, and two equity indices.
@@ -316,6 +322,13 @@ The Kalman hedge ratio for Australia against Canada ranged between {{beta_min}} 
 - **What worked.** The mathematics: from-scratch ADF and Engle–Granger tests that match `statsmodels`, half-lives, and a Kalman filter for drifting hedge ratios.
 - **What the data say.** A screen of 253 pairs finds only a few more “cointegrated” pairs than chance predicts, and none survives a Bonferroni correction; most relationships found in 2010–2017 did not survive to 2018–2026, and the selected pairs' out-of-sample Sharpe ratio ({{sh_out}}) is far below the in-sample one ({{sh_in}}). Classic pairs trading of large stocks has decayed since the 1990s (Gatev, Goetzmann and Rouwenhorst, 2006, documented the decline), as many funds compete for the same gaps.
 - **How professionals do it now.** Many assets at once (baskets and residuals of factor models, which is Chapter 6's cross-section combined with this chapter's mean reversion), short holding periods with careful cost control, and economic reasons for every relationship. The stop-loss and the decision to retire a pair are as important as the entry rule.
+
+## Launch, monitor and maintain
+
+- **Re-screen on a schedule** (for example every year, with the same rules and the same number of pairs tested), and retire pairs rather than keep them out of loyalty. Record why each pair was selected: an economic reason, not only a p-value.
+- **Monitor each live pair**: the rolling half-life of its spread, the time spent beyond the stop level, and the Kalman hedge ratio. A half-life that keeps growing means the leash is breaking.
+- **Corporate events break pairs overnight.** Mergers, spin-offs and index changes need a manual check before the next trade; most pairs desks flatten a pair on the announcement.
+- **Costs and borrowing.** Every trade has a short leg. Check that the stock can be borrowed and include the borrow fee; for hard-to-borrow names it can exceed the whole edge.
 
 ## Try it out
 

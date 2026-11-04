@@ -414,6 +414,13 @@ Minimum variance was by far the best defence in the long bear markets (2000–20
 
 **Recommendation.** Over fifty years, the method that ignored expected returns completely and minimised risk (Sharpe {{sh_min_s}}) beat both 1/N ({{sh_1N}}) and the mean–variance optimiser ({{sh_meanva_s}}), with a third less volatility and much smaller drawdowns in long bear markets. Its weakness is concentration (about four effective holdings), so in practice: use minimum variance with a shrunk covariance and weight caps if the goal is low risk, or HRP (Sharpe {{sh_HRP}}) if broad diversification matters; never feed raw sample means into an optimiser; and treat the predicted risk of optimised portfolios as optimistic. Expected returns should come from a separately validated model (Chapters 5 and 6), shrunk heavily towards zero, or from priors such as the Black–Litterman equilibrium (Exercise 4). Note how close the Sharpe ratios are: the differences between methods are smaller than the estimation error of a 50-year Sharpe ratio (about ±0.15), so robustness and risk, not the ranking, should decide.
 
+## Launch, monitor and maintain
+
+- **Rebalance on a fixed calendar** (monthly here) with the covariance estimated only from data available on the rebalance date, exactly as in the walk-forward. Log the inputs, the weights and the code version every time.
+- **Monitor predicted against realised risk.** Each quarter, compare the portfolio's realised volatility with the volatility the covariance model predicted. Optimised portfolios tend to under-predict their own risk; a ratio persistently above about 1.2 means the shrinkage is too weak or the window too short.
+- **Watch concentration and turnover.** Track the effective number of holdings (1 / Σw²) and the monthly turnover. A sudden collapse in the effective number of holdings usually means one asset's estimated variance has dropped, often because of a data problem.
+- **Keep the weight caps** you tested with. Lifting a cap in production changes the strategy you validated.
+
 ## Try it out
 
 ::playground animations/frontier_lab.html 760
