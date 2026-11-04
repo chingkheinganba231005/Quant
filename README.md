@@ -37,7 +37,7 @@ Theory and maths from scratch, then end-to-end projects on real market data, eac
 | 7 | [Pairs Trading and Statistical Arbitrage](financial-ml/07-pairs-trading/) | Cointegration and the ADF test from scratch, the Ornstein–Uhlenbeck spread, a Kalman-filter hedge ratio, and how fast relative-value edges decay. |
 | 8 | [Options, Volatility and Neural Pricers](financial-ml/08-options-and-neural-pricers/) | Black–Scholes, trees and Monte Carlo, implied volatility, a delta-hedging simulation, the Heston model, and a neural-network surrogate, written from scratch, that prices options about a hundred times faster. |
 | 9 | [Execution and Market Making](financial-ml/09-execution-and-market-making/) | Price impact, Almgren–Chriss optimal execution, an order-book simulator, Avellaneda–Stoikov market making and a reinforcement-learning trader. |
-| 10 | Capstone: From Idea to Paper Trading *(coming)* | A complete research pipeline with regime detection: hypothesis, data, features, validation, portfolio, risk, a research report, and a paper-trading loop you can run. |
+| 10 | [Capstone: From Idea to Paper Trading](financial-ml/10-capstone/) | A complete research pipeline with regime detection: hypothesis, data, features, validation, portfolio, risk, a research report, and a paper-trading loop you can run. |
 
 ## Running the notebooks
 

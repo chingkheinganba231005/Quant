@@ -1,0 +1,30 @@
+{
+  "hypothesis_1": "A 2-state Gaussian HMM on daily SPY returns, used only through its forward-filtered probabilities, improves the risk-adjusted return of a SPY investor: exposure = 1 - P(turbulent), the rest in T-bills.",
+  "hypothesis_2": "The same regime signal also improves a diversified, trend-filtered, volatility-targeted ETF portfolio (Chapters 2-4).",
+  "data": "daily adjusted closes of 8 ETFs, VIX and the 3-month T-bill, 2003-01 to 2026-11 (Yahoo Finance, FRED)",
+  "model_refit": "every year on an expanding window of all data before that year",
+  "development_period": [
+    "2007-01-01",
+    "2020-12-31"
+  ],
+  "holdout_period": [
+    "2021-01-01",
+    "2026-11-03"
+  ],
+  "measures": [
+    "excess-return Sharpe ratio",
+    "maximum drawdown",
+    "annual turnover"
+  ],
+  "benchmarks": [
+    "SPY",
+    "SPY volatility-targeted to 16% (no leverage)",
+    "60/40 SPY/IEF"
+  ],
+  "costs_bps_per_unit_turnover": {
+    "SPY strategy": 2,
+    "ETF portfolio": 5
+  },
+  "tuning": "at most 9 variants (exposure floor x no-trade band), chosen on the development period only",
+  "success": "development Sharpe above SPY's with a deflated Sharpe ratio > 0.95, then confirmed once on the hold-out (Sharpe not below SPY's and a smaller maximum drawdown)"
+}

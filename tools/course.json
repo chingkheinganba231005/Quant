@@ -123,7 +123,7 @@
           "n": "10",
           "title": "Capstone: From Idea to Paper Trading",
           "path": "financial-ml/10-capstone/",
-          "ready": false,
+          "ready": true,
           "kind": "Capstone",
           "desc": "A complete research pipeline with regime detection: hypothesis, data, features, validation, portfolio, risk, a research report, and a paper-trading loop you can run."
         }

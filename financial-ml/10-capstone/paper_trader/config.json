@@ -1,0 +1,8 @@
+{
+  "ticker": "SPY",
+  "first_data": "2003-01-01",
+  "floor": 0.0,
+  "band": 0.1,
+  "cost_bps": 2.0,
+  "initial_capital": 1000000
+}
