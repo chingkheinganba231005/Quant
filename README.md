@@ -28,7 +28,7 @@ Theory and maths from scratch, then end-to-end projects on real market data, eac
 
 | # | Chapter | What you learn |
 |---|---|---|
-| 1 | The Statistics of Financial Returns *(coming)* | Returns and stationarity, fat tails, volatility clustering, autocorrelation tests, maximum likelihood, the bootstrap and block bootstrap, and why one backtest proves almost nothing (multiple testing, the deflated Sharpe ratio). |
+| 1 | [The Statistics of Financial Returns](financial-ml/01-statistics-of-returns/) | Returns and stationarity, fat tails, volatility clustering, autocorrelation tests, maximum likelihood, the bootstrap and block bootstrap, and why one backtest proves almost nothing (multiple testing, the deflated Sharpe ratio). |
 | 2 | A Backtester from Scratch: Trend Following *(coming)* | Build an honest vectorised backtester, test time-series momentum on real ETFs, add costs and volatility targeting, walk forward, and measure how much of the result is luck. |
 | 3 | Forecasting Volatility *(coming)* | Realised volatility, EWMA, GARCH(1,1) fitted by maximum likelihood from scratch, HAR and gradient boosting, judged with the right loss, then used to size positions. |
 | 4 | Portfolio Construction out of Sample *(coming)* | Mean–variance and why it fails on real estimates, shrinkage, minimum variance, risk parity and hierarchical risk parity, compared in a walk-forward test. |

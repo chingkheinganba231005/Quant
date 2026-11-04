@@ -51,7 +51,7 @@
           "n": "1",
           "title": "The Statistics of Financial Returns",
           "path": "financial-ml/01-statistics-of-returns/",
-          "ready": false,
+          "ready": true,
           "kind": "Theory",
           "desc": "Returns and stationarity, fat tails, volatility clustering, autocorrelation tests, maximum likelihood, the bootstrap and block bootstrap, and why one backtest proves almost nothing (multiple testing, the deflated Sharpe ratio)."
         },

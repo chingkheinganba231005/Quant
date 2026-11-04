@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Luck Lab</title>
+<style>
+:root{--bg:#fff;--ink:#1d2128;--muted:#5d6470;--line:#d9d6cc;--on:#0f6b5c;--on-ink:#fff;--a:#3a6fd0;--b:#e08a2c;--bad:#c8372d;--soft:#e2f1ed;color-scheme:light}
+:root[data-theme=dark]{--bg:#181c22;--ink:#e7e9ee;--muted:#a2a9b6;--line:#2e343e;--on:#4fc7ad;--on-ink:#0c1512;--a:#77a3f0;--b:#f0a75a;--bad:#f2786e;--soft:#16302b;color-scheme:dark}
+@media (prefers-color-scheme:dark){:root:not([data-theme=light]){--bg:#181c22;--ink:#e7e9ee;--muted:#a2a9b6;--line:#2e343e;--on:#4fc7ad;--on-ink:#0c1512;--a:#77a3f0;--b:#f0a75a;--bad:#f2786e;--soft:#16302b;color-scheme:dark}}
+*{box-sizing:border-box}body{margin:0;padding:14px 16px;background:var(--bg);color:var(--ink);font:15px/1.5 Inter,system-ui,sans-serif}
+.tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
+button{font:inherit;border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:999px;padding:6px 14px;cursor:pointer}
+button.on{background:var(--on);border-color:var(--on);color:var(--on-ink)}
+.pane{display:none}.pane.on{display:block}
+.ctl{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:8px 18px;margin:6px 0 10px}
+label{display:flex;flex-direction:column;font-size:13px;color:var(--muted)}label b{color:var(--ink);font-size:14px}
+input[type=range]{width:100%}
+svg{width:100%;height:auto;display:block;border:1px solid var(--line);border-radius:10px;background:var(--bg)}
+.msg{font:14px/1.55 Inter,sans-serif;background:var(--soft);border-radius:8px;padding:9px 13px;margin-top:8px}
+.ax{stroke:var(--muted);stroke-width:1}.tx{fill:var(--muted);font:11px Inter,sans-serif}.tb{fill:var(--ink);font:600 12px Inter,sans-serif}
+</style></head><body>
+<div class="tabs"><button class="on" data-t="mt">Noise vs skill</button><button data-t="yrs">Years needed</button><button data-t="tails">Tails</button></div>
+
+<section class="pane on" id="mt">
+  <div class="ctl">
+    <label>strategies tried, N: <b id="nv"></b><input type="range" id="n" min="0" max="3" step="0.05" value="2"></label>
+    <label>years of data: <b id="tv"></b><input type="range" id="t" min="1" max="30" value="5"></label>
+    <label>true Sharpe of ONE real strategy among them: <b id="sv"></b><input type="range" id="s" min="0" max="1.5" step="0.05" value="0.5"></label>
+    <div style="display:flex;align-items:end;gap:8px"><button id="rerun">↻ new sample</button></div>
+  </div>
+  <svg id="mtsvg" viewBox="0 0 640 300"></svg>
+  <div class="msg" id="mtmsg"></div>
+</section>
+
+<section class="pane" id="yrs">
+  <div class="ctl">
+    <label>true annual Sharpe ratio: <b id="ysv"></b><input type="range" id="ys" min="0" max="1.5" step="0.05" value="0.5"></label>
+    <label>show years up to: <b id="ytv"></b><input type="range" id="yt" min="5" max="40" value="30"></label>
+  </div>
+  <svg id="ysvg" viewBox="0 0 640 300"></svg>
+  <div class="msg" id="ymsg"></div>
+</section>
+
+<section class="pane" id="tails">
+  <div class="ctl">
+    <label>Student-t degrees of freedom ν: <b id="dfv"></b><input type="range" id="df" min="2.5" max="30" step="0.5" value="3.5"></label>
+    <label>years of daily data: <b id="tyv"></b><input type="range" id="ty" min="10" max="100" value="76"></label>
+  </div>
+  <svg id="tsvg" viewBox="0 0 640 300"></svg>
+  <div class="msg" id="tmsg"></div>
+</section>
+
+<script>
+try{var pt=parent.document.documentElement.dataset.theme;if(pt)document.documentElement.dataset.theme=pt}catch(e){}
+document.querySelectorAll('.tabs button').forEach(function(b){b.onclick=function(){document.querySelectorAll('.tabs button').forEach(function(x){x.classList.toggle('on',x===b)});document.querySelectorAll('.pane').forEach(function(p){p.classList.toggle('on',p.id===b.dataset.t)});draw()}});
+var seed=7;function rnd(){seed|=0;seed=seed+0x6D2B79F5|0;var t=Math.imul(seed^seed>>>15,1|seed);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}
+function randn(){var u=0,v=0;while(u===0)u=rnd();while(v===0)v=rnd();return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v)}
+function Phi(x){var t=1/(1+0.2316419*Math.abs(x)),d=0.3989423*Math.exp(-x*x/2),p=d*t*(0.3193815+t*(-0.3565638+t*(1.781478+t*(-1.821256+t*1.330274))));return x>0?1-p:p}
+function PhiInv(p){var a=[-39.6968302866538,220.946098424521,-275.928510446969,138.357751867269,-30.6647980661472,2.50662827745924],b=[-54.4760987982241,161.585836858041,-155.698979859887,66.8013118877197,-13.2806815528857],c=[-0.00778489400243029,-0.322396458041136,-2.40075827716184,-2.54973253934373,4.37466414146497,2.93816398269878],d=[0.00778469570904146,0.32246712907004,2.445134137143,3.75440866190742],q,r;
+ if(p<0.02425){q=Math.sqrt(-2*Math.log(p));return(((((c[0]*q+c[1])*q+c[2])*q+c[3])*q+c[4])*q+c[5])/((((d[0]*q+d[1])*q+d[2])*q+d[3])*q+1)}
+ if(p>1-0.02425){q=Math.sqrt(-2*Math.log(1-p));return-(((((c[0]*q+c[1])*q+c[2])*q+c[3])*q+c[4])*q+c[5])/((((d[0]*q+d[1])*q+d[2])*q+d[3])*q+1)}
+ q=p-0.5;r=q*q;return(((((a[0]*r+a[1])*r+a[2])*r+a[3])*r+a[4])*r+a[5])*q/(((((b[0]*r+b[1])*r+b[2])*r+b[3])*r+b[4])*r+1)}
+var G=0.5772156649;function emax(N){return N<2?0:(1-G)*PhiInv(1-1/N)+G*PhiInv(1-1/(N*Math.E))}
+function $(id){return document.getElementById(id)}
+function hist(svg,vals,lo,hi,bins,marks,xlab){var W=640,H=300,L=40,Rr=20,T=20,B=40,cnt=new Array(bins).fill(0);vals.forEach(function(v){var k=Math.floor((v-lo)/(hi-lo)*bins);if(k>=0&&k<bins)cnt[k]++});var mx=Math.max.apply(null,cnt)||1;
+ var s='<line class="ax" x1="'+L+'" y1="'+(H-B)+'" x2="'+(W-Rr)+'" y2="'+(H-B)+'"/>';var bw=(W-L-Rr)/bins;
+ cnt.forEach(function(c,i){var h=(H-T-B)*c/mx;s+='<rect x="'+(L+i*bw+0.5)+'" y="'+(H-B-h)+'" width="'+(bw-1)+'" height="'+h+'" fill="var(--a)" opacity=".55"/>'});
+ for(var k=0;k<=6;k++){var v=lo+(hi-lo)*k/6,x=L+(W-L-Rr)*k/6;s+='<text class="tx" x="'+x+'" y="'+(H-B+16)+'" text-anchor="middle">'+v.toFixed(1)+'</text>'}
+ s+='<text class="tx" x="'+((W+L)/2)+'" y="'+(H-6)+'" text-anchor="middle">'+xlab+'</text>';
+ marks.forEach(function(m){var x=L+(W-L-Rr)*(m.v-lo)/(hi-lo);if(x<L||x>W-Rr)return;s+='<line x1="'+x+'" y1="'+T+'" x2="'+x+'" y2="'+(H-B)+'" stroke="'+m.c+'" stroke-width="2.5"/><text class="tb" x="'+(x+4)+'" y="'+(T+12+(m.dy||0))+'" style="fill:'+m.c+'">'+m.t+'</text>'});svg.innerHTML=s}
+var sample=null;
+function drawMT(){var N=Math.round(Math.pow(10,+$('n').value)),T=+$('t').value,S=+$('s').value;$('nv').textContent=N;$('tv').textContent=T;$('sv').textContent=S.toFixed(2);
+ // each annual SR estimate ~ N(true, 1/T) (normal returns approximation)
+ seed=sample||7;var sd=1/Math.sqrt(T),srs=[];for(var i=0;i<N;i++)srs.push((i===0?S:0)+sd*randn());
+ var best=0;for(i=1;i<N;i++)if(srs[i]>srs[best])best=i;
+ var mean=srs.reduce(function(a,b){return a+b},0)/N,v=srs.reduce(function(a,b){return a+(b-mean)*(b-mean)},0)/Math.max(1,N-1),srStar=Math.sqrt(v)*emax(N);
+ var n=252*T,z=function(sr){return (sr-0)/Math.sqrt(252)*Math.sqrt(n-1)/Math.sqrt(1+0.5*Math.pow(sr/Math.sqrt(252),2))},psr=Phi(z(srs[best])),dsr=N>1?Phi(((srs[best]-srStar)/Math.sqrt(252))*Math.sqrt(n-1)/Math.sqrt(1+0.5*Math.pow(srs[best]/Math.sqrt(252),2))):psr;
+ hist($('mtsvg'),srs.slice(1).concat(N===1?[srs[0]]:[]),-2.5,3.5,60,[{v:srs[0],c:'var(--on)',t:'the real strategy: '+srs[0].toFixed(2)},{v:srs[best],c:'var(--bad)',t:'best: '+srs[best].toFixed(2),dy:16},{v:srStar,c:'var(--b)',t:'luck benchmark SR*: '+srStar.toFixed(2),dy:32}],'estimated annual Sharpe ratios of the '+N+' strategies');
+ $('mtmsg').innerHTML=(best===0?'<b>The real strategy won.</b> ':'<b>A zero-skill strategy beat the real one.</b> ')+'Best observed Sharpe '+srs[best].toFixed(2)+'. PSR (ignores the search) = '+(psr*100).toFixed(1)+'%; <b>deflated SR = '+(dsr*100).toFixed(1)+'%</b> (accounts for '+N+' trials). With '+N+' tries and '+T+' years, pure luck alone is expected to reach about '+(emax(N)/Math.sqrt(T)).toFixed(2)+'.'}
+['n','t','s'].forEach(function(id){$(id).oninput=drawMT});$('rerun').onclick=function(){sample=Math.floor(Math.random()*1e9);drawMT()};
+function drawY(){var S=+$('ys').value,Tm=+$('yt').value;$('ysv').textContent=S.toFixed(2);$('ytv').textContent=Tm;var W=640,H=300,L=46,Rr=20,T=16,B=40,lo=-1.5,hi=Math.max(2.5,S+1);
+ function X(y){return L+(W-L-Rr)*y/Tm}function Y(v){return T+(H-T-B)*(hi-v)/(hi-lo)}
+ var s='<line class="ax" x1="'+L+'" y1="'+Y(0)+'" x2="'+(W-Rr)+'" y2="'+Y(0)+'"/><line class="ax" x1="'+L+'" y1="'+T+'" x2="'+L+'" y2="'+(H-B)+'"/>';
+ var up='',dn='',up2='',dn2='';for(var y=1;y<=Tm;y+=0.25){var sd=1/Math.sqrt(y);up+=(up?'L':'M')+X(y)+' '+Y(S+1.645*sd);dn+=(dn?'L':'M')+X(y)+' '+Y(S-1.645*sd)}
+ var band='',i;for(y=1;y<=Tm;y+=0.25)band+=(band?'L':'M')+X(y)+' '+Y(S+1.645/Math.sqrt(y));for(y=Tm;y>=1;y-=0.25)band+='L'+X(y)+' '+Y(S-1.645/Math.sqrt(y));
+ s+='<path d="'+band+'Z" fill="var(--a)" opacity=".18"/><line x1="'+L+'" y1="'+Y(S)+'" x2="'+(W-Rr)+'" y2="'+Y(S)+'" stroke="var(--on)" stroke-width="2"/>';
+ seed=11;for(var k=0;k<8;k++){var cum=0,p='';for(var d=1;d<=Tm*12;d++){cum+=S/12+randn()/Math.sqrt(12);var yy=d/12;p+=(p?'L':'M')+X(yy)+' '+Y(cum/yy)}s+='<path d="'+p+'" fill="none" stroke="var(--b)" stroke-width="1" opacity=".75"/>'}
+ var need=S>0?Math.pow(2/S,2):Infinity;if(need<=Tm)s+='<line x1="'+X(need)+'" y1="'+T+'" x2="'+X(need)+'" y2="'+(H-B)+'" stroke="var(--bad)" stroke-dasharray="4 3"/><text class="tb" x="'+(X(need)+4)+'" y="'+(T+12)+'" style="fill:var(--bad)">t = 2 after '+need.toFixed(1)+' years</text>';
+ for(i=0;i<=Tm;i+=5)s+='<text class="tx" x="'+X(i)+'" y="'+(H-B+16)+'" text-anchor="middle">'+i+'</text>';for(var v=-1;v<=hi;v+=1)s+='<text class="tx" x="'+(L-6)+'" y="'+(Y(v)+4)+'" text-anchor="end">'+v.toFixed(0)+'</text>';
+ s+='<text class="tx" x="'+((W+L)/2)+'" y="'+(H-6)+'" text-anchor="middle">years observed</text>';$('ysvg').innerHTML=s;
+ $('ymsg').innerHTML='Orange lines: 8 managers with the SAME true Sharpe '+S.toFixed(2)+'; each plots the Sharpe ratio estimated from its record so far. Blue band: 90% of all possible histories. '+(S>0?'You need <b>'+need.toFixed(1)+' years</b> before a typical record reaches t = 2.':'With zero skill, the band is centred on zero forever.')}
+['ys','yt'].forEach(function(id){$(id).oninput=drawY});
+function lgamma(x){var c=[76.18009172947146,-86.50532032941677,24.01409824083091,-1.231739572450155,0.1208650973866179e-2,-0.5395239384953e-5],y=x,t=x+5.5;t-=(x+0.5)*Math.log(t);var s=1.000000000190015;for(var j=0;j<6;j++)s+=c[j]/++y;return-t+Math.log(2.5066282746310005*s/x)}
+function tpdf(x,nu){return Math.exp(lgamma((nu+1)/2)-lgamma(nu/2))/Math.sqrt(nu*Math.PI)*Math.pow(1+x*x/nu,-(nu+1)/2)}
+function tsf(k,nu){var sc=Math.sqrt(nu/(nu-2)),a=k*sc,s=0,h=0.01,x;for(x=a;x<a+400;x+=h)s+=tpdf(x+h/2,nu)*h;return s} // P(Z>k) for unit-variance t
+function drawT(){var nu=+$('df').value,yrs=+$('ty').value;$('dfv').textContent=nu.toFixed(1);$('tyv').textContent=yrs;var n=252*yrs,W=640,H=300,L=56,Rr=20,T=16,B=40;
+ function X(k){return L+(W-L-Rr)*(k-1)/9}function Y(lp){return T+(H-T-B)*(0-lp)/8}
+ var s='<line class="ax" x1="'+L+'" y1="'+(H-B)+'" x2="'+(W-Rr)+'" y2="'+(H-B)+'"/><line class="ax" x1="'+L+'" y1="'+T+'" x2="'+L+'" y2="'+(H-B)+'"/>',pn='',pt='',rows=[];
+ for(var k=1;k<=10;k+=0.1){var a=2*(1-Phi(k)),b=2*tsf(k,nu);pn+=(pn?'L':'M')+X(k)+' '+Y(Math.log10(Math.max(a,1e-8)));pt+=(pt?'L':'M')+X(k)+' '+Y(Math.log10(Math.max(b,1e-8)))}
+ s+='<path d="'+pn+'" fill="none" stroke="var(--a)" stroke-width="2.2"/><path d="'+pt+'" fill="none" stroke="var(--b)" stroke-width="2.2"/>';
+ for(var e=0;e>=-8;e-=2)s+='<text class="tx" x="'+(L-6)+'" y="'+(Y(e)+4)+'" text-anchor="end">1e'+e+'</text>';for(k=1;k<=10;k++)s+='<text class="tx" x="'+X(k)+'" y="'+(H-B+16)+'" text-anchor="middle">'+k+'σ</text>';
+ s+='<text class="tb" x="'+(W-200)+'" y="40" style="fill:var(--a)">normal</text><text class="tb" x="'+(W-200)+'" y="58" style="fill:var(--b)">Student-t, ν = '+nu.toFixed(1)+'</text><text class="tx" x="'+((W+L)/2)+'" y="'+(H-6)+'" text-anchor="middle">size of a daily move (standard deviations), probability on a log scale</text>';$('tsvg').innerHTML=s;
+ var msg='Expected number of days beyond ±k σ in '+yrs+' years ('+n.toLocaleString()+' days):<br>';[3,4,5,7,10].forEach(function(k){msg+='<b>'+k+'σ</b>: normal '+(n*2*(1-Phi(k))).toPrecision(2)+' · t '+(n*2*tsf(k,nu)).toPrecision(2)+'&nbsp;&nbsp; '});
+ $('tmsg').innerHTML=msg+'<br>The S&P 500 since 1950 had 54 days beyond 5σ, where a normal distribution expects 0.01. The fitted ν in the chapter is about 3: tails thousands of times fatter than normal.'}
+['df','ty'].forEach(function(id){$(id).oninput=drawT});
+function draw(){drawMT();drawY();drawT()}draw();
+</script></body></html>
