@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>NumPy Playground</title>
+<style>
+:root{--bg:#fff;--ink:#1d2128;--muted:#5d6470;--line:#d9d6cc;--cell:#f4f2ec;--on:#0f6b5c;--on-ink:#fff;--hot:#e08a2c;--bad:#c8372d;--soft:#e2f1ed;color-scheme:light}
+:root[data-theme=dark]{--bg:#181c22;--ink:#e7e9ee;--muted:#a2a9b6;--line:#2e343e;--cell:#232932;--on:#4fc7ad;--on-ink:#0c1512;--hot:#f0a75a;--bad:#f2786e;--soft:#16302b;color-scheme:dark}
+@media (prefers-color-scheme:dark){:root:not([data-theme=light]){--bg:#181c22;--ink:#e7e9ee;--muted:#a2a9b6;--line:#2e343e;--cell:#232932;--on:#4fc7ad;--on-ink:#0c1512;--hot:#f0a75a;--bad:#f2786e;--soft:#16302b;color-scheme:dark}}
+*{box-sizing:border-box}body{margin:0;padding:14px 16px;background:var(--bg);color:var(--ink);font:15px/1.5 Inter,system-ui,sans-serif}
+.tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
+.tabs button,.btn{font:inherit;border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:999px;padding:6px 14px;cursor:pointer}
+.tabs button.on,.btn.on{background:var(--on);border-color:var(--on);color:var(--on-ink)}
+.pane{display:none}.pane.on{display:block}
+.grid{display:inline-grid;gap:4px;margin:8px 0}
+.c{width:46px;height:40px;display:grid;place-items:center;background:var(--cell);border:1px solid var(--line);border-radius:6px;font:600 14px ui-monospace,Menlo,monospace;transition:all .35s}
+.c.on{background:var(--on);color:var(--on-ink);border-color:var(--on)}
+.c.ghost{opacity:.35;border-style:dashed}
+.c.res{background:var(--hot);color:#111;border-color:var(--hot)}
+input[type=text]{font:15px ui-monospace,Menlo,monospace;padding:7px 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);width:min(100%,260px)}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:6px 0}
+.msg{font:14px ui-monospace,Menlo,monospace;background:var(--soft);border-radius:8px;padding:8px 12px;margin-top:8px;white-space:pre-wrap}
+.msg.err{background:color-mix(in srgb,var(--bad) 18%,transparent);color:var(--bad)}
+.muted{color:var(--muted);font-size:13px}
+.flex{display:flex;gap:26px;flex-wrap:wrap;align-items:flex-start}
+.lbl{font:600 12px Inter,sans-serif;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+</style></head><body>
+<div class="tabs"><button class="on" data-t="slice">Slicing</button><button data-t="axis">Axis</button><button data-t="bc">Broadcasting</button></div>
+
+<section class="pane on" id="slice">
+  <div class="row"><code>M = np.arange(24).reshape(4, 6)</code></div>
+  <div class="row"><label>Expression <input type="text" id="sx" value="M[1:3, ::2]" aria-label="slice expression"></label></div>
+  <div class="row" id="presets"></div>
+  <div class="grid" id="sg"></div>
+  <div class="msg" id="smsg"></div>
+  <p class="muted">Rules: <code>start:stop:step</code>, stop excluded, negative numbers count from the end, a single number picks one row or column. Also try a mask like <code>M[M % 5 == 0]</code> or a list like <code>M[[0, 3]]</code>.</p>
+</section>
+
+<section class="pane" id="axis">
+  <div class="row"><span>A table of returns, shape <code>(4 days, 5 assets)</code>. Collapse it:</span></div>
+  <div class="row"><button class="btn on" data-ax="0">mean(axis=0)</button><button class="btn" data-ax="1">mean(axis=1)</button><button class="btn" data-ax="n">mean()</button><button class="btn" id="play">▶ animate</button></div>
+  <div class="flex"><div><div class="lbl">X</div><div class="grid" id="ag"></div></div><div><div class="lbl">result</div><div class="grid" id="ar"></div></div></div>
+  <div class="msg" id="amsg"></div>
+</section>
+
+<section class="pane" id="bc">
+  <div class="row"><label>shape of a <input type="text" id="sa" value="(4, 3)"></label><label>shape of b <input type="text" id="sb" value="(3,)"></label></div>
+  <div class="row" id="bpresets"></div>
+  <div class="flex"><div><div class="lbl">a</div><div class="grid" id="ga"></div></div><div><div class="lbl">b (stretched cells dashed)</div><div class="grid" id="gb"></div></div></div>
+  <div class="msg" id="bmsg"></div>
+</section>
+
+<script>
+try{var pt=parent.document.documentElement.dataset.theme;if(pt)document.documentElement.dataset.theme=pt}catch(e){}
+document.querySelectorAll('.tabs button').forEach(function(b){b.onclick=function(){document.querySelectorAll('.tabs button').forEach(function(x){x.classList.toggle('on',x===b)});document.querySelectorAll('.pane').forEach(function(p){p.classList.toggle('on',p.id===b.dataset.t)})}});
+function cells(el,rows,cols,fn){el.style.gridTemplateColumns='repeat('+cols+',46px)';el.innerHTML='';for(var i=0;i<rows;i++)for(var j=0;j<cols;j++){var d=document.createElement('div');d.className='c';fn(d,i,j);el.appendChild(d)}}
+/* ---------- slicing ---------- */
+var R=4,C=6;
+function parseIdx(s,n){s=s.trim();if(s===''||s===':')return range(0,n,1);
+ if(s.indexOf(':')<0){var k=parseInt(s,10);if(isNaN(k))throw Error('cannot read "'+s+'"');if(k<0)k+=n;if(k<0||k>=n)throw Error('index '+s+' is out of bounds for size '+n);return {single:k}}
+ var p=s.split(':');if(p.length>3)throw Error('too many colons in "'+s+'"');
+ var step=p[2]!==undefined&&p[2].trim()!==''?parseInt(p[2],10):1;if(step===0)throw Error('slice step cannot be zero');
+ function b(v,d){if(v===undefined||v.trim()==='')return d;var x=parseInt(v,10);if(isNaN(x))throw Error('cannot read "'+v+'"');if(x<0)x+=n;return x}
+ var start,stop;if(step>0){start=Math.max(0,Math.min(n,b(p[0],0)));stop=Math.max(0,Math.min(n,b(p[1],n)))}else{start=Math.min(n-1,b(p[0],n-1));stop=p[1]===undefined||p[1].trim()===''?-1:Math.max(-1,b(p[1],-1))}
+ return range(start,stop,step)}
+function range(a,b,s){var r=[];if(s>0)for(var i=a;i<b;i+=s)r.push(i);else for(var j=a;j>b;j+=s)r.push(j);return r}
+function splitTop(s){var out=[],d=0,cur='';for(var i=0;i<s.length;i++){var ch=s[i];if(ch==='['||ch==='(')d++;if(ch===']'||ch===')')d--;if(ch===','&&d===0){out.push(cur);cur=''}else cur+=ch}out.push(cur);return out}
+function runSlice(){var e=document.getElementById('sx').value.replace(/\s+/g,' ').trim(),msg=document.getElementById('smsg'),on={},shape='';
+ try{var m=e.match(/^M\[(.*)\]$/);if(!m)throw Error('write it as M[...]');var inner=m[1].trim();
+  var mm=inner.match(/^M\s*(%|>|<|>=|<=|==)\s*(\d+)\s*(==\s*(\d+))?$/);
+  if(mm){var op=mm[1],v=+mm[2],eq=mm[4]!==undefined?+mm[4]:null,cnt=0;for(var i=0;i<R;i++)for(var j=0;j<C;j++){var x=i*C+j,ok;if(op==='%')ok=(x%v)===(eq===null?0:eq);else ok=eval(x+op+v);if(ok){on[i+','+j]=1;cnt++}}shape='('+cnt+',)  ← a boolean mask returns a 1-D COPY'}
+  else if(/^\[[\d,\s-]+\]$/.test(inner)){var rows=JSON.parse(inner).map(function(k){if(k<0)k+=R;if(k<0||k>=R)throw Error('row '+k+' out of bounds');return k});rows.forEach(function(r){for(var j=0;j<C;j++)on[r+','+j]=1});shape='('+rows.length+', '+C+')  ← fancy indexing returns a COPY'}
+  else{var parts=splitTop(inner);if(parts.length>2)throw Error('M has only 2 axes');var ri=parseIdx(parts[0],R),cj=parseIdx(parts.length>1?parts[1]:':',C);
+   var rl=ri.single!==undefined?[ri.single]:ri,cl=cj.single!==undefined?[cj.single]:cj;rl.forEach(function(r){cl.forEach(function(c){on[r+','+c]=1})});
+   var dims=[];if(ri.single===undefined)dims.push(rl.length);if(cj.single===undefined)dims.push(cl.length);shape=dims.length?'('+dims.join(', ')+(dims.length===1?',':'')+')':'a single number';shape+='  ← basic slicing returns a VIEW'}
+  msg.className='msg';msg.textContent='result shape: '+shape;
+ }catch(err){msg.className='msg err';msg.textContent='IndexError / SyntaxError: '+err.message}
+ cells(document.getElementById('sg'),R,C,function(d,i,j){d.textContent=i*C+j;if(on[i+','+j])d.classList.add('on')})}
+['M[1:3, ::2]','M[:, 1]','M[-1]','M[::-1, :2]','M[1:, -2:]','M[M % 5 == 0]','M[[0, 3]]','M[2, 4]'].forEach(function(p){var b=document.createElement('button');b.className='btn';b.textContent=p;b.onclick=function(){document.getElementById('sx').value=p;runSlice()};document.getElementById('presets').appendChild(b)});
+document.getElementById('sx').oninput=runSlice;runSlice();
+/* ---------- axis ---------- */
+var X=[[1.0,-0.5,0.2,0.4,-0.1],[0.3,0.8,-0.1,0.2,0.6],[-1.2,0.4,0.0,-0.3,0.1],[0.7,-0.3,0.5,0.1,-0.2]],ax='0',timer=null;
+function mean(a){return a.reduce(function(s,x){return s+x},0)/a.length}
+function f(x){return (Math.round(x*100)/100).toFixed(2)}
+function drawAxis(step){var res,msg,hl=function(){return false};
+ if(ax==='0'){res=[X[0].map(function(_,j){return mean(X.map(function(r){return r[j]}))})];msg='axis=0 runs DOWN the rows (over the days): axis 0 disappears.\nresult shape (5,): one mean per asset';if(step!==null)hl=function(i,j){return j===step}}
+ else if(ax==='1'){res=X.map(function(r){return [mean(r)]});msg='axis=1 runs ACROSS the columns (over the assets): axis 1 disappears.\nresult shape (4,): one mean per day';if(step!==null)hl=function(i,j){return i===step}}
+ else{res=[[mean([].concat.apply([],X))]];msg='no axis: every element, result is one number';if(step!==null)hl=function(){return true}}
+ cells(document.getElementById('ag'),4,5,function(d,i,j){d.textContent=f(X[i][j]);if(hl(i,j))d.classList.add('on')});
+ var rr=res.length,rc=res[0].length;cells(document.getElementById('ar'),rr,rc,function(d,i,j){var show=step===null||(ax==='0'?j<=step:ax==='1'?i<=step:true);d.textContent=show?f(res[i][j]):'';if(show)d.classList.add('res')});
+ document.getElementById('amsg').textContent=msg}
+document.querySelectorAll('[data-ax]').forEach(function(b){b.onclick=function(){ax=b.dataset.ax;document.querySelectorAll('[data-ax]').forEach(function(x){x.classList.toggle('on',x===b)});clearInterval(timer);drawAxis(null)}});
+document.getElementById('play').onclick=function(){clearInterval(timer);var n=ax==='0'?5:ax==='1'?4:1,k=0;drawAxis(0);timer=setInterval(function(){k++;if(k>=n){clearInterval(timer);setTimeout(function(){drawAxis(null)},700);return}drawAxis(k)},700)};
+drawAxis(null);
+/* ---------- broadcasting ---------- */
+function shp(s){var m=s.replace(/[()\s]/g,'').split(',').filter(function(x){return x!==''}).map(Number);if(!m.length||m.some(function(x){return !(x>=1&&x<=8&&Math.floor(x)===x)}))throw Error('use 1 or 2 dimensions, each between 1 and 8, like (4, 3)');if(m.length>2)throw Error('this demo draws at most 2 dimensions');return m}
+function runBc(){var msg=document.getElementById('bmsg');try{var a=shp(document.getElementById('sa').value),b=shp(document.getElementById('sb').value);
+ var A=a.length===1?[1,a[0]]:a,B=b.length===1?[1,b[0]]:b,out=[],steps=[];
+ steps.push('right-align:  a '+JSON.stringify(a)+' → ('+A.join(', ')+')   b '+JSON.stringify(b)+' → ('+B.join(', ')+')');
+ for(var k=0;k<2;k++){if(A[k]===B[k])out.push(A[k]);else if(A[k]===1)out.push(B[k]);else if(B[k]===1)out.push(A[k]);else{throw Error('axis '+k+': '+A[k]+' vs '+B[k]+' are different and neither is 1\noperands could not be broadcast together\nfix: make one of them 1, e.g. b[:, None] or b.reshape(-1, 1)')}}
+ steps.push('compare each axis: equal, or one of them is 1  ✓');steps.push('result shape ('+out.join(', ')+')');
+ cells(document.getElementById('ga'),out[0],out[1],function(d,i,j){var real=(A[0]===1?i===0:true)&&(A[1]===1?j===0:true);d.textContent='a';if(!real)d.classList.add('ghost');else d.classList.add('on')});
+ cells(document.getElementById('gb'),out[0],out[1],function(d,i,j){var real=(B[0]===1?i===0:true)&&(B[1]===1?j===0:true);d.textContent='b';if(!real)d.classList.add('ghost');else d.classList.add('res')});
+ msg.className='msg';msg.textContent=steps.join('\n')}catch(e){msg.className='msg err';msg.textContent='ValueError: '+e.message;document.getElementById('ga').innerHTML='';document.getElementById('gb').innerHTML=''}}
+[['(4, 3)','(3,)'],['(4, 3)','(4,)'],['(4, 3)','(4, 1)'],['(4, 1)','(1, 3)'],['(5, 5)','(1,)']].forEach(function(p){var b=document.createElement('button');b.className='btn';b.textContent=p[0]+' & '+p[1];b.onclick=function(){document.getElementById('sa').value=p[0];document.getElementById('sb').value=p[1];runBc()};document.getElementById('bpresets').appendChild(b)});
+document.getElementById('sa').oninput=runBc;document.getElementById('sb').oninput=runBc;runBc();
+</script></body></html>

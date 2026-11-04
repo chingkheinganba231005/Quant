@@ -1,0 +1,50 @@
+{
+  "tracks": [
+    {
+      "id": "prereq", "name": "Part 0 · Finance from zero",
+      "blurb": "No finance knowledge assumed. Money, banks, interest, bonds, stocks, markets, risk, portfolios, CAPM, accounts, derivatives, Black–Scholes, efficient markets, backtesting and the basics of financial ML, in 18 interactive lessons and a roadmap.",
+      "chapters": [
+        {"n": "0", "title": "Finance From Zero", "path": "00-finance-from-zero/", "ready": true,
+         "desc": "18 lessons from “what is money?” to options pricing, efficient markets and your first backtest. Every lesson has a like-you’re-five explanation, the real idea, a quant view and interactive demos."}
+      ]
+    },
+    {
+      "id": "toolkit", "name": "Part 1 · The Python data toolkit",
+      "blurb": "The three libraries every data scientist and quant uses daily, from the first line to the advanced tricks: NumPy for arrays and maths, pandas for tables and time series, Matplotlib (with seaborn and Plotly) for charts. All examples use financial data.",
+      "chapters": [
+        {"n": "T1", "title": "NumPy from Zero", "path": "toolkit/01-numpy-from-zero/", "ready": true,
+         "desc": "Arrays and dtypes, slicing and the view trap, vectorisation, axes, broadcasting, linear algebra for portfolios (covariance, solve, PCA, Cholesky, least squares), random numbers and Monte Carlo, the bootstrap, rolling windows and einsum."},
+        {"n": "T2", "title": "pandas from Zero", "path": "toolkit/02-pandas-from-zero/", "ready": false,
+         "desc": "Series and DataFrames, loc and iloc, cleaning and missing data, groupby, merge and reshape, and the time-series toolkit: dates, resampling, rolling and exponential windows, shifting without look-ahead, panel data of many stocks."},
+        {"n": "T3", "title": "Plotting from Zero", "path": "toolkit/03-plotting-from-zero/", "ready": false,
+         "desc": "Matplotlib’s figure and axes model, every common chart, dates, twin axes and annotations, publication styling, then seaborn for statistical plots and Plotly for interactive dashboards, ending with a full market report."}
+      ]
+    },
+    {
+      "id": "fml", "name": "Part 2 · Financial ML and algorithmic trading",
+      "blurb": "Theory and maths from scratch, then end-to-end projects on real market data, each one harder than the last. Every chapter has a guide, a notebook that reproduces every number and figure, the dataset, and an interactive playground.",
+      "chapters": [
+        {"n": "1", "title": "The Statistics of Financial Returns", "path": "financial-ml/01-statistics-of-returns/", "ready": false, "kind": "Theory",
+         "desc": "Returns and stationarity, fat tails, volatility clustering, autocorrelation tests, maximum likelihood, the bootstrap and block bootstrap, and why one backtest proves almost nothing (multiple testing, the deflated Sharpe ratio)."},
+        {"n": "2", "title": "A Backtester from Scratch: Trend Following", "path": "financial-ml/02-backtesting-trend-following/", "ready": false, "kind": "Project",
+         "desc": "Build an honest vectorised backtester, test time-series momentum on real ETFs, add costs and volatility targeting, walk forward, and measure how much of the result is luck."},
+        {"n": "3", "title": "Forecasting Volatility", "path": "financial-ml/03-forecasting-volatility/", "ready": false, "kind": "Project",
+         "desc": "Realised volatility, EWMA, GARCH(1,1) fitted by maximum likelihood from scratch, HAR and gradient boosting, judged with the right loss, then used to size positions."},
+        {"n": "4", "title": "Portfolio Construction out of Sample", "path": "financial-ml/04-portfolio-construction/", "ready": false, "kind": "Project",
+         "desc": "Mean–variance and why it fails on real estimates, shrinkage, minimum variance, risk parity and hierarchical risk parity, compared in a walk-forward test."},
+        {"n": "5", "title": "Financial Machine Learning Done Right", "path": "financial-ml/05-financial-ml-done-right/", "ready": false, "kind": "Theory + project",
+         "desc": "Labels (fixed horizon, triple barrier), meta-labelling, overlapping samples, purged and embargoed cross-validation, feature importance and the probability of backtest overfitting."},
+        {"n": "6", "title": "Cross-Sectional Factors and ML Ranking", "path": "financial-ml/06-cross-sectional-ml/", "ready": false, "kind": "Project",
+         "desc": "Momentum, reversal and low-risk signals across a stock universe, information coefficients, Fama–MacBeth regressions, long–short portfolios, and ML rankers judged after costs."},
+        {"n": "7", "title": "Pairs Trading and Statistical Arbitrage", "path": "financial-ml/07-pairs-trading/", "ready": false, "kind": "Project",
+         "desc": "Cointegration and the ADF test from scratch, the Ornstein–Uhlenbeck spread, a Kalman-filter hedge ratio, and how fast relative-value edges decay."},
+        {"n": "8", "title": "Options, Volatility and Neural Pricers", "path": "financial-ml/08-options-and-neural-pricers/", "ready": false, "kind": "Project",
+         "desc": "Black–Scholes, trees and Monte Carlo, implied volatility, a delta-hedging simulation, the Heston model, and a neural-network surrogate that prices options a thousand times faster."},
+        {"n": "9", "title": "Execution and Market Making", "path": "financial-ml/09-execution-and-market-making/", "ready": false, "kind": "Project",
+         "desc": "Price impact, Almgren–Chriss optimal execution, an order-book simulator, Avellaneda–Stoikov market making and a reinforcement-learning trader."},
+        {"n": "10", "title": "Capstone: From Idea to Paper Trading", "path": "financial-ml/10-capstone/", "ready": false, "kind": "Capstone",
+         "desc": "A complete research pipeline with regime detection: hypothesis, data, features, validation, portfolio, risk, a research report, and a paper-trading loop you can run."}
+      ]
+    }
+  ]
+}
