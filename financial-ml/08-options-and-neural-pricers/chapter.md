@@ -330,7 +330,7 @@ R["std_4x"] = f"{hedge_tab.loc[84, 'std / premium']:.0%}"
 The hedge is unbiased (mean P&L ≈ 0) and its error shrinks like $1/\sqrt{n}$: hedging daily leaves a standard deviation of {{std_daily}} of the premium, four times a day {{std_4x}}; hedging only once, at the start, leaves {{std_once}}. Now the interesting case: what if the volatility that actually happens differs from the one the option was sold at?
 
 :::math
-Over an instant, a delta-hedged short option earns its time decay and loses on the curvature: $d\Pi = -\tfrac12\,\Gamma S^2\,(\sigma_{\text{realised}}^2 - \sigma_{\text{implied}}^2)\,dt$. The seller of an option is **short volatility**: she wins when the market moves less than the implied volatility predicted and loses when it moves more, no matter in which direction. To first order the total P&L is $\mathcal V\,(\sigma_{\text{implied}} - \sigma_{\text{realised}})$.
+Over an instant, a delta-hedged short option earns its time decay and loses on the curvature: $d\Pi = -\tfrac12\,\Gamma S^2\,(\sigma_{\text{realised}}^2 - \sigma_{\text{implied}}^2)\,dt$. The seller of an option is **short volatility**: the seller wins when the market moves less than the implied volatility predicted and loses when it moves more, no matter in which direction. To first order the total P&L is $\mathcal V\,(\sigma_{\text{implied}} - \sigma_{\text{realised}})$.
 :::
 
 ```python

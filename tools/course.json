@@ -115,7 +115,7 @@
           "n": "9",
           "title": "Execution and Market Making",
           "path": "financial-ml/09-execution-and-market-making/",
-          "ready": false,
+          "ready": true,
           "kind": "Project",
           "desc": "Price impact, Almgren–Chriss optimal execution, an order-book simulator, Avellaneda–Stoikov market making and a reinforcement-learning trader."
         },

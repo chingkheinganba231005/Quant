@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Execution Lab</title>
+<style>
+:root{--bg:#fff;--ink:#1d2128;--muted:#5d6470;--line:#d9d6cc;--on:#0f6b5c;--on-ink:#fff;--a:#0f6b5c;--b:#3a6fd0;--c:#e08a2c;--bad:#c8372d;--soft:#e2f1ed;color-scheme:light}
+:root[data-theme=dark]{--bg:#181c22;--ink:#e7e9ee;--muted:#a2a9b6;--line:#2e343e;--on:#4fc7ad;--on-ink:#0c1512;--a:#4fc7ad;--b:#77a3f0;--c:#f0a75a;--bad:#f2786e;--soft:#16302b;color-scheme:dark}
+@media (prefers-color-scheme:dark){:root:not([data-theme=light]){--bg:#181c22;--ink:#e7e9ee;--muted:#a2a9b6;--line:#2e343e;--on:#4fc7ad;--on-ink:#0c1512;--a:#4fc7ad;--b:#77a3f0;--c:#f0a75a;--bad:#f2786e;--soft:#16302b;color-scheme:dark}}
+*{box-sizing:border-box}body{margin:0;padding:12px 14px;background:var(--bg);color:var(--ink);font:14.5px/1.45 Inter,system-ui,sans-serif}
+.tabs{display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap}button{font:inherit;font-size:13.5px;border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:999px;padding:5px 13px;cursor:pointer}button.on{background:var(--on);border-color:var(--on);color:var(--on-ink)}
+.pane{display:none}.pane.on{display:block}
+.ctl{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:6px 16px}label{display:flex;flex-direction:column;font-size:12.5px;color:var(--muted)}label b{color:var(--ink);font-size:13.5px}input[type=range]{width:100%}
+.btns{display:flex;gap:6px;flex-wrap:wrap;align-items:end}
+svg{width:100%;height:auto;display:block;margin-top:6px}.ax{stroke:var(--line)}.tx{fill:var(--muted);font:11px Inter,sans-serif}.lb{font:600 12px Inter,sans-serif}
+.msg{font-size:13.5px;background:var(--soft);border-radius:8px;padding:8px 12px;margin-top:6px}
+table{border-collapse:collapse;font:13px Inter,sans-serif;font-variant-numeric:tabular-nums;width:100%;margin-top:6px}th,td{padding:4px 8px;border-bottom:1px solid var(--line);text-align:right}th:first-child,td:first-child{text-align:left}
+</style></head><body>
+<div class="tabs"><button class="on" data-t="ob">Order book</button><button data-t="ac">Optimal execution</button><button data-t="mm">Market making</button></div>
+<section class="pane on" id="ob">
+  <div class="ctl">
+    <label>limit-order rate α (per level): <b id="alv"></b><input type="range" id="al" min="0.05" max="1" step="0.05" value="0.3"></label>
+    <label>cancellation rate δ (per order): <b id="dev"></b><input type="range" id="de" min="0.005" max="0.15" step="0.005" value="0.04"></label>
+    <label>market-order rate μ: <b id="muv"></b><input type="range" id="mu" min="0.5" max="6" step="0.5" value="2"></label>
+    <label>your order size: <b id="qv"></b><input type="range" id="q" min="5" max="150" step="5" value="40"></label>
+    <div class="btns"><button id="mb">market buy</button><button id="ms">market sell</button><button id="pa">pause</button></div>
+  </div>
+  <svg id="obs" viewBox="0 0 700 300"></svg><div class="msg" id="obm"></div>
+</section>
+<section class="pane" id="ac">
+  <div class="ctl">
+    <label>risk aversion (κT): <b id="ktv"></b><input type="range" id="kt" min="0" max="10" step="0.25" value="3"></label>
+    <label>daily volatility: <b id="sgv"></b><input type="range" id="sg" min="0.5" max="4" step="0.1" value="1.1"></label>
+    <label>impact: cost of TWAP (bps): <b id="tcv"></b><input type="range" id="tc" min="5" max="100" step="1" value="25"></label>
+  </div>
+  <svg id="acs" viewBox="0 0 700 280"></svg><table id="act"></table><div class="msg" id="acm"></div>
+</section>
+<section class="pane" id="mm">
+  <div class="ctl">
+    <label>risk aversion γ: <b id="gav"></b><input type="range" id="ga" min="0.01" max="1" step="0.01" value="0.1"></label>
+    <label>order-flow sensitivity k: <b id="kv"></b><input type="range" id="k" min="0.5" max="5" step="0.1" value="1.5"></label>
+    <label>volatility σ: <b id="msv"></b><input type="range" id="ms2" min="0.5" max="5" step="0.1" value="2"></label>
+    <label>informed flow ε (price jump per fill): <b id="epv"></b><input type="range" id="ep" min="0" max="2" step="0.05" value="0"></label>
+    <div class="btns"><button id="mmn">↻ new days</button></div>
+  </div>
+  <svg id="mms" viewBox="0 0 700 250"></svg><table id="mmt"></table><div class="msg" id="mmm"></div>
+</section>
+<script>
+try{var pt=parent.document.documentElement.dataset.theme;if(pt)document.documentElement.dataset.theme=pt}catch(e){}
+document.querySelectorAll('.tabs button').forEach(function(b){b.onclick=function(){document.querySelectorAll('.tabs button').forEach(function(x){x.classList.toggle('on',x===b)});document.querySelectorAll('.pane').forEach(function(p){p.classList.toggle('on',p.id===b.dataset.t)})}});
+function $(i){return document.getElementById(i)}
+function path(pts){return pts.map(function(q,i){return(i?'L':'M')+q[0].toFixed(1)+' '+q[1].toFixed(1)}).join('')}
+var seed=3;function rnd(){seed|=0;seed=seed+0x6D2B79F5|0;var t=Math.imul(seed^seed>>>15,1|seed);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}
+function randn(){var u=0,v=0;while(u===0)u=rnd();while(v===0)v=rnd();return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v)}
+// ---------- tab 1: zero-intelligence order book (Math.random so it keeps evolving)
+var L=400,W0=30,bid=new Int32Array(L),ask=new Int32Array(L),hist=[],paused=false,lastMsg='';
+(function init(){for(var i=170;i<200;i++)bid[i]=2;for(var j=201;j<231;j++)ask[j]=2})();
+function best(){var bb=-1,ba=-1;for(var i=L-1;i>=0;i--)if(bid[i]>0){bb=i;break}for(var j=0;j<L;j++)if(ask[j]>0){ba=j;break}return[bb,ba]}
+function sum(a){var s=0;for(var i=0;i<a.length;i++)s+=a[i];return s}
+function removeRandom(a,n){var t=Math.random()*n,c=0;for(var i=0;i<L;i++){c+=a[i];if(c>t){a[i]--;return}}}
+function step(){var al=+$('al').value,de=+$('de').value,mu=+$('mu').value,b=best(),bb=b[0],ba=b[1],nb=sum(bid),na=sum(ask);
+ var rates=[al*W0,al*W0,mu/2,mu/2,de*nb,de*na],tot=rates.reduce(function(x,y){return x+y}),u=Math.random()*tot,k=0;while(u>rates[k]){u-=rates[k];k++}
+ if(k===0){var p=ba-1-Math.floor(Math.random()*W0);if(p>=0)bid[p]++}else if(k===1){var p2=bb+1+Math.floor(Math.random()*W0);if(p2<L)ask[p2]++}
+ else if(k===2&&na>1)ask[ba]--;else if(k===3&&nb>1)bid[bb]--;else if(k===4&&nb>1)removeRandom(bid,nb);else if(k===5&&na>1)removeRandom(ask,na);
+ b=best();if(b[0]<60||b[1]>L-60){var sh=200-Math.round((b[0]+b[1])/2);bid=roll(bid,sh);ask=roll(ask,sh);hist=hist.map(function(h){return h+sh})}}
+function roll(a,sh){var o=new Int32Array(L);for(var i=0;i<L;i++){var j=i+sh;if(j>=0&&j<L)o[j]=a[i]}return o}
+function hit(side){var q=+$('q').value,b=best(),m0=(b[0]+b[1])/2,left=q,worst=null,cost=0,filled=0;var book=side==='buy'?ask:bid;
+ if(side==='buy'){for(var j=b[1];j<L&&left>0;j++){var t=Math.min(book[j],left);if(t>0){book[j]-=t;left-=t;cost+=t*(j-m0);filled+=t;worst=j}}}
+ else{for(var i=b[0];i>=0&&left>0;i--){var t2=Math.min(book[i],left);if(t2>0){book[i]-=t2;left-=t2;cost+=t2*(m0-i);filled+=t2;worst=i}}}
+ var b2=best(),m1=(b2[0]+b2[1])/2;lastMsg='Your market '+side+' of '+filled+' shares filled at prices up to <b>'+Math.abs(worst-m0).toFixed(1)+' ticks</b> from the mid (average '+(cost/filled).toFixed(2)+' ticks) and moved the mid by <b>'+(m1-m0).toFixed(1)+'</b> ticks. Watch the gap refill as new limit orders arrive.'}
+$('mb').onclick=function(){hit('buy')};$('ms').onclick=function(){hit('sell')};$('pa').onclick=function(){paused=!paused;this.textContent=paused?'resume':'pause'};
+function drawOB(){$('alv').textContent=(+$('al').value).toFixed(2);$('dev').textContent=(+$('de').value).toFixed(3);$('muv').textContent=$('mu').value;$('qv').textContent=$('q').value;
+ var b=best(),mid=(b[0]+b[1])/2,lo=Math.round(mid)-30,W=700,Lp=40,R=10,T=14,H1=170,X=function(p){return Lp+(W-Lp-R)*(p-lo+0.5)/61},bw=(W-Lp-R)/61-1,mx=1,s='';
+ for(var p=lo;p<=lo+60;p++)mx=Math.max(mx,bid[p]||0,ask[p]||0);mx=Math.max(mx,8);
+ for(var p=lo;p<=lo+60;p++){if(bid[p]>0){var h=H1*bid[p]/mx;s+='<rect x="'+(X(p)-bw/2)+'" y="'+(T+H1-h)+'" width="'+bw+'" height="'+h+'" fill="var(--a)" opacity=".75"/>'}if(ask[p]>0){var h2=H1*ask[p]/mx;s+='<rect x="'+(X(p)-bw/2)+'" y="'+(T+H1-h2)+'" width="'+bw+'" height="'+h2+'" fill="var(--c)" opacity=".75"/>'}}
+ s+='<line x1="'+X(mid)+'" x2="'+X(mid)+'" y1="'+T+'" y2="'+(T+H1)+'" stroke="var(--ink)" stroke-dasharray="3 3"/>';
+ s+='<text class="lb" x="'+(Lp+4)+'" y="'+(T+10)+'" style="fill:var(--a)">bids (buy orders waiting)</text><text class="lb" x="'+(W-R-4)+'" y="'+(T+10)+'" text-anchor="end" style="fill:var(--c)">asks (sell orders waiting)</text>';
+ for(var t=-30;t<=30;t+=10)s+='<text class="tx" x="'+X(Math.round(mid)+t)+'" y="'+(T+H1+14)+'" text-anchor="middle">'+(t>0?'+':'')+t+'</text>';
+ s+='<text class="tx" x="'+(W/2)+'" y="'+(T+H1+27)+'" text-anchor="middle">price, in ticks from the mid</text>';
+ // mid history
+ var T2=230,H2=60,hs=hist.slice(-300);if(hs.length>1){var hl=Math.min.apply(null,hs),hh=Math.max.apply(null,hs);if(hh-hl<6){hl-=3;hh+=3}
+  s+='<path d="'+path(hs.map(function(v,i){return[Lp+(W-Lp-R)*i/299,T2+H2*(hh-v)/(hh-hl)]}))+'" fill="none" stroke="var(--b)" stroke-width="1.5"/><text class="tx" x="'+Lp+'" y="'+(T2-3)+'">mid price, last 300 frames</text>'}
+ $('obs').innerHTML=s;$('obm').innerHTML=(lastMsg?lastMsg+'<br>':'')+'Spread now: <b>'+(b[1]-b[0])+'</b> ticks; shares waiting within 10 ticks: '+(function(){var c=0;for(var p=b[0]-9;p<=b[0];p++)c+=bid[p];for(var q=b[1];q<b[1]+10;q++)c+=ask[q];return c})()+'. Lower α or raise δ to thin the book, then send the same order again: impact grows.'}
+function loop(){if(!paused&&$('ob').classList.contains('on')){for(var i=0;i<25;i++)step();var b=best();hist.push((b[0]+b[1])/2);if(hist.length>600)hist.shift()}if($('ob').classList.contains('on'))drawOB();requestAnimationFrame(loop)}
+for(var i=0;i<20000;i++)step();drawOB();requestAnimationFrame(loop);
+// ---------- tab 2: Almgren-Chriss (normalised: sell X = 1 over T = 1 day in N steps)
+function drawAC(){var kT=+$('kt').value,sg=+$('sg').value/100,tc=+$('tc').value/1e4,N=78,tau=1/N;$('ktv').textContent=kT.toFixed(2);$('sgv').textContent=(sg*100).toFixed(1)+'%';$('tcv').textContent=Math.round(tc*1e4);
+ var eta=tc;function traj(k){var x=[];for(var i=0;i<=N;i++){var t=i*tau;x.push(k===0?1-t:Math.sinh(k*(1-t))/Math.sinh(k))}return x}
+ function cost(x){var E=0,V=0;for(var i=1;i<=N;i++){var n=x[i-1]-x[i];E+=eta/tau*n*n;V+=sg*sg*tau*x[i]*x[i]}return[E,Math.sqrt(V)]}
+ var x=traj(kT),xt=traj(0),c=cost(x),ct=cost(xt),W=700,H=280,s='';
+ var L1=40,W1=330,T=14,H1=220,X1=function(i){return L1+W1*i/N},Y1=function(v){return T+H1*(1-v)};
+ s+='<line class="ax" x1="'+L1+'" x2="'+(L1+W1)+'" y1="'+Y1(0)+'" y2="'+Y1(0)+'"/><text class="tx" x="'+(L1-5)+'" y="'+(Y1(1)+4)+'" text-anchor="end">100%</text><text class="tx" x="'+(L1-5)+'" y="'+(Y1(0)+4)+'" text-anchor="end">0</text>';
+ s+='<path d="'+path(xt.map(function(v,i){return[X1(i),Y1(v)]}))+'" fill="none" stroke="var(--muted)" stroke-dasharray="4 3"/><path d="'+path(x.map(function(v,i){return[X1(i),Y1(v)]}))+'" fill="none" stroke="var(--a)" stroke-width="2.5"/>';
+ s+='<text class="lb" x="'+(L1+W1-4)+'" y="'+(T+12)+'" text-anchor="end" style="fill:var(--a)">shares left to sell</text><text class="tx" x="'+(L1+W1-4)+'" y="'+(T+26)+'" text-anchor="end">dashed: TWAP</text>';
+ ['9:30','12:45','16:00'].forEach(function(lb,i){s+='<text class="tx" x="'+X1(i*N/2)+'" y="'+(T+H1+14)+'" text-anchor="middle">'+lb+'</text>'});
+ // frontier
+ var fr=[];for(var k=0;k<=12;k+=0.2)fr.push(cost(traj(k)));var L2=410,W2=280,emax=Math.max.apply(null,fr.map(function(f){return f[0]})),smax=Math.max.apply(null,fr.map(function(f){return f[1]})),smin=Math.min.apply(null,fr.map(function(f){return f[1]}));
+ var X2=function(v){return L2+W2*(v-smin*0.9)/(smax*1.02-smin*0.9)},Y2=function(v){return T+H1*(1-v/(emax*1.05))};
+ s+='<path d="'+path(fr.map(function(f){return[X2(f[1]),Y2(f[0])]}))+'" fill="none" stroke="var(--ink)"/><circle cx="'+X2(c[1])+'" cy="'+Y2(c[0])+'" r="6" fill="var(--a)"/><circle cx="'+X2(ct[1])+'" cy="'+Y2(ct[0])+'" r="5" fill="var(--muted)"/>';
+ s+='<line class="ax" x1="'+L2+'" x2="'+(L2+W2)+'" y1="'+(T+H1)+'" y2="'+(T+H1)+'"/><line class="ax" x1="'+L2+'" x2="'+L2+'" y1="'+T+'" y2="'+(T+H1)+'"/>';
+ s+='<text class="tx" x="'+(L2+W2/2)+'" y="'+(T+H1+14)+'" text-anchor="middle">risk (std of shortfall)</text><text class="tx" x="'+(L2+6)+'" y="'+(T+10)+'">expected cost</text>';
+ $('acs').innerHTML=s;
+ $('act').innerHTML='<tr><th>schedule</th><th>expected cost (bps)</th><th>std (bps)</th><th>sold by 10:30</th></tr><tr><td>TWAP</td><td>'+(ct[0]*1e4).toFixed(1)+'</td><td>'+(ct[1]*1e4).toFixed(1)+'</td><td>'+((1-xt[12])*100).toFixed(0)+'%</td></tr><tr><td>Almgren–Chriss, κT = '+kT+'</td><td>'+(c[0]*1e4).toFixed(1)+'</td><td>'+(c[1]*1e4).toFixed(1)+'</td><td>'+((1-x[12])*100).toFixed(0)+'%</td></tr>';
+ $('acm').innerHTML='κT = √(λσ²/η)·T combines risk aversion λ, volatility σ and impact η into one number. Raise volatility and the same trader should sell faster (risk costs more); raise impact and the trader should be more patient. Every point on the frontier is optimal for some trader: choosing one is a business decision, not a statistical one.'}
+['kt','sg','tc'].forEach(function(i){$(i).oninput=drawAC});drawAC();
+// ---------- tab 3: Avellaneda-Stoikov
+var mmSeed=11;
+function drawMM(){var g=+$('ga').value,k=+$('k').value,sig=+$('ms2').value,ep=+$('ep').value;$('gav').textContent=g.toFixed(2);$('kv').textContent=k.toFixed(1);$('msv').textContent=sig.toFixed(1);$('epv').textContent=ep.toFixed(2);
+ var A=140,T=1,dt=0.005,N=200,P=300,res={},path0={};seed=mmSeed;
+ ['aware','sym'].forEach(function(mode){var pn=[],qs=[],qp=[];seed=mmSeed;
+  for(var p=0;p<P;p++){var s=100,q=0,cash=0;for(var i=0;i<N;i++){var tau=T-i*dt,spread=g*sig*sig*tau+2/g*Math.log(1+g/k),r=mode==='aware'?s-q*g*sig*sig*tau:s,a=r+spread/2,b=r-spread/2;
+   var ha=rnd()<A*Math.exp(-k*(a-s))*dt,hb=rnd()<A*Math.exp(-k*(s-b))*dt;if(ha){q--;cash+=a}if(hb){q++;cash-=b}s+=sig*Math.sqrt(dt)*(rnd()<0.5?-1:1)+ep*((ha?1:0)-(hb?1:0));if(p===0)qp.push(q)}
+   pn.push(cash+q*s);qs.push(Math.abs(q))}
+  var mu=pn.reduce(function(x,y){return x+y})/P,sd=Math.sqrt(pn.reduce(function(x,y){return x+(y-mu)*(y-mu)},0)/(P-1));res[mode]={mu:mu,sd:sd,q:qs.reduce(function(x,y){return x+y})/P};path0[mode]=qp});
+ var W=700,H=250,L=40,R=10,T0=14,B=24,all=path0.aware.concat(path0.sym),qmax=Math.max(4,Math.max.apply(null,all.map(Math.abs))),X=function(i){return L+(W-L-R)*i/(N-1)},Y=function(v){return T0+(H-T0-B)*(qmax-v)/(2*qmax)},s='';
+ s+='<line class="ax" x1="'+L+'" x2="'+(W-R)+'" y1="'+Y(0)+'" y2="'+Y(0)+'"/><text class="tx" x="'+(L-5)+'" y="'+(Y(qmax)+8)+'" text-anchor="end">+'+qmax+'</text><text class="tx" x="'+(L-5)+'" y="'+(Y(-qmax))+'" text-anchor="end">−'+qmax+'</text>';
+ s+='<path d="'+path(path0.sym.map(function(v,i){return[X(i),Y(v)]}))+'" fill="none" stroke="var(--c)" stroke-width="2"/><path d="'+path(path0.aware.map(function(v,i){return[X(i),Y(v)]}))+'" fill="none" stroke="var(--a)" stroke-width="2"/>';
+ s+='<text class="lb" x="'+(L+6)+'" y="'+(T0+10)+'" style="fill:var(--a)">inventory-aware</text><text class="lb" x="'+(L+130)+'" y="'+(T0+10)+'" style="fill:var(--c)">symmetric</text><text class="tx" x="'+(W/2)+'" y="'+(H-6)+'" text-anchor="middle">inventory through one simulated day</text>';
+ $('mms').innerHTML=s;
+ $('mmt').innerHTML='<tr><th>'+P+' simulated days</th><th>mean P&amp;L</th><th>std P&amp;L</th><th>mean / std</th><th>mean |final inventory|</th></tr>'+[['inventory-aware','aware'],['symmetric','sym']].map(function(r){var o=res[r[1]];return'<tr><td>'+r[0]+'</td><td>'+o.mu.toFixed(1)+'</td><td>'+o.sd.toFixed(1)+'</td><td>'+(o.mu/o.sd).toFixed(2)+'</td><td>'+o.q.toFixed(2)+'</td></tr>'}).join('');
+ $('mmm').innerHTML='Raise γ: the inventory-aware maker shades its quotes harder, its inventory stays near zero and its P&amp;L becomes more predictable, at the cost of some profit. Now raise the informed-flow ε: each fill is followed by a move against the maker, and the profit melts, for both strategies. That is adverse selection, the real enemy of market makers.'}
+['ga','k','ms2','ep'].forEach(function(i){$(i).oninput=drawMM});$('mmn').onclick=function(){mmSeed=Math.floor(Math.random()*1e9);drawMM()};drawMM();
+</script></body></html>
