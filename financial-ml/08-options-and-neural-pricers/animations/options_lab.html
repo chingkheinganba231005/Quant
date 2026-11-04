@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Options Lab</title>
+<style>
+:root{--bg:#fff;--ink:#1d2128;--muted:#5d6470;--line:#d9d6cc;--on:#0f6b5c;--on-ink:#fff;--a:#0f6b5c;--b:#3a6fd0;--c:#e08a2c;--bad:#c8372d;--soft:#e2f1ed;color-scheme:light}
+:root[data-theme=dark]{--bg:#181c22;--ink:#e7e9ee;--muted:#a2a9b6;--line:#2e343e;--on:#4fc7ad;--on-ink:#0c1512;--a:#4fc7ad;--b:#77a3f0;--c:#f0a75a;--bad:#f2786e;--soft:#16302b;color-scheme:dark}
+@media (prefers-color-scheme:dark){:root:not([data-theme=light]){--bg:#181c22;--ink:#e7e9ee;--muted:#a2a9b6;--line:#2e343e;--on:#4fc7ad;--on-ink:#0c1512;--a:#4fc7ad;--b:#77a3f0;--c:#f0a75a;--bad:#f2786e;--soft:#16302b;color-scheme:dark}}
+*{box-sizing:border-box}body{margin:0;padding:12px 14px;background:var(--bg);color:var(--ink);font:14.5px/1.45 Inter,system-ui,sans-serif}
+.tabs{display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap}button{font:inherit;font-size:13.5px;border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:999px;padding:5px 13px;cursor:pointer}button.on{background:var(--on);border-color:var(--on);color:var(--on-ink)}
+.pane{display:none}.pane.on{display:block}
+.ctl{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:6px 16px}label{display:flex;flex-direction:column;font-size:12.5px;color:var(--muted)}label b{color:var(--ink);font-size:13.5px}input[type=range]{width:100%}
+select{font:inherit;padding:4px 6px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink)}
+svg{width:100%;height:auto;display:block;margin-top:6px}.ax{stroke:var(--line)}.tx{fill:var(--muted);font:11px Inter,sans-serif}.lb{font:600 12px Inter,sans-serif}
+.msg{font-size:13.5px;background:var(--soft);border-radius:8px;padding:8px 12px;margin-top:6px}
+table{border-collapse:collapse;font:13px Inter,sans-serif;font-variant-numeric:tabular-nums;width:100%;margin-top:6px}th,td{padding:4px 8px;border-bottom:1px solid var(--line);text-align:right}th:first-child,td:first-child{text-align:left}
+</style></head><body>
+<div class="tabs"><button class="on" data-t="bs">Black–Scholes &amp; Greeks</button><button data-t="dh">Delta hedging</button><button data-t="hs">Heston smile</button></div>
+<section class="pane on" id="bs">
+  <div class="ctl">
+    <label>option<select id="kind"><option value="call">call</option><option value="put">put</option></select></label>
+    <label>spot (strike = 100): <b id="sv"></b><input type="range" id="s" min="60" max="140" value="100"></label>
+    <label>volatility: <b id="volv"></b><input type="range" id="vol" min="0.05" max="0.8" step="0.01" value="0.2"></label>
+    <label>days to expiry: <b id="tv"></b><input type="range" id="t" min="1" max="730" value="90"></label>
+    <label>interest rate: <b id="rv"></b><input type="range" id="r" min="0" max="0.1" step="0.0025" value="0.04"></label>
+  </div>
+  <svg id="bss" viewBox="0 0 700 300"></svg><table id="bst"></table><div class="msg" id="bsm"></div>
+</section>
+<section class="pane" id="dh">
+  <div class="ctl">
+    <label>implied vol (price you sell at): <b id="ivv"></b><input type="range" id="iv" min="0.05" max="0.6" step="0.01" value="0.2"></label>
+    <label>realised vol (what happens): <b id="rvv"></b><input type="range" id="rvol" min="0.05" max="0.6" step="0.01" value="0.2"></label>
+    <label>rebalancing<select id="reb"><option value="1">once (at the start)</option><option value="4">weekly</option><option value="21" selected>daily</option><option value="84">4× a day</option><option value="336">16× a day</option></select></label>
+    <div style="display:flex;align-items:end"><button id="dhn">↻ new paths</button></div>
+  </div>
+  <svg id="dhs" viewBox="0 0 700 250"></svg><div class="msg" id="dhm"></div>
+</section>
+<section class="pane" id="hs">
+  <div class="ctl">
+    <label>current vol √v₀: <b id="v0v"></b><input type="range" id="v0" min="0.05" max="0.4" step="0.005" value="0.2"></label>
+    <label>long-run vol √θ: <b id="thv"></b><input type="range" id="th" min="0.05" max="0.4" step="0.005" value="0.2"></label>
+    <label>mean reversion κ: <b id="kav"></b><input type="range" id="ka" min="0.5" max="10" step="0.1" value="2"></label>
+    <label>vol of vol σ: <b id="sgv"></b><input type="range" id="sg" min="0.1" max="2.5" step="0.05" value="0.6"></label>
+    <label>correlation ρ: <b id="rhv"></b><input type="range" id="rh" min="-0.95" max="0.5" step="0.05" value="0"></label>
+    <div style="display:flex;align-items:end"><button id="hcal">use the calibrated values</button></div>
+  </div>
+  <svg id="hss" viewBox="0 0 700 280"></svg><div class="msg" id="hsm"></div>
+</section>
+<script src="data.js"></script>
+<script>
+try{var pt=parent.document.documentElement.dataset.theme;if(pt)document.documentElement.dataset.theme=pt}catch(e){}
+document.querySelectorAll('.tabs button').forEach(function(b){b.onclick=function(){document.querySelectorAll('.tabs button').forEach(function(x){x.classList.toggle('on',x===b)});document.querySelectorAll('.pane').forEach(function(p){p.classList.toggle('on',p.id===b.dataset.t)})}});
+function $(i){return document.getElementById(i)}
+function path(pts){return pts.map(function(q,i){return(i?'L':'M')+q[0].toFixed(1)+' '+q[1].toFixed(1)}).join('')}
+// standard normal cdf (Abramowitz-Stegun 7.1.26 on erf, error < 1.5e-7) and pdf
+function Phi(x){var z=Math.abs(x)/Math.SQRT2,t=1/(1+0.3275911*z),y=1-(((((1.061405429*t-1.453152027)*t)+1.421413741)*t-0.284496736)*t+0.254829592)*t*Math.exp(-z*z);return x>=0?0.5*(1+y):0.5*(1-y)}
+function phi(x){return Math.exp(-x*x/2)/Math.sqrt(2*Math.PI)}
+function bs(S,K,T,r,v,kind){var sT=v*Math.sqrt(T),d1=(Math.log(S/K)+(r+v*v/2)*T)/sT,d2=d1-sT,D=Math.exp(-r*T);
+ var c=S*Phi(d1)-K*D*Phi(d2);if(kind==='put')return{p:c-S+K*D,delta:Phi(d1)-1,gamma:phi(d1)/(S*sT),vega:S*phi(d1)*Math.sqrt(T),theta:-S*phi(d1)*v/(2*Math.sqrt(T))+r*K*D*Phi(-d2)};
+ return{p:c,delta:Phi(d1),gamma:phi(d1)/(S*sT),vega:S*phi(d1)*Math.sqrt(T),theta:-S*phi(d1)*v/(2*Math.sqrt(T))-r*K*D*Phi(d2)}}
+// ---------- tab 1
+function drawBS(){var kind=$('kind').value,S=+$('s').value,v=+$('vol').value,days=+$('t').value,r=+$('r').value,T=days/365,K=100;
+ $('sv').textContent=S;$('volv').textContent=(v*100).toFixed(0)+'%';$('tv').textContent=days;$('rv').textContent=(r*100).toFixed(2)+'%';
+ var W=700,L=40,R=10,T1=10,H1=180,T2=215,H2=60,xs=[],i;for(i=0;i<=160;i++)xs.push(60+i*0.5);
+ var X=function(s){return L+(W-L-R)*(s-60)/80},vals=xs.map(function(s){return bs(s,K,T,r,v,kind)}),pay=xs.map(function(s){return kind==='call'?Math.max(s-K,0):Math.max(K-s,0)});
+ var ymax=Math.max(10,Math.max.apply(null,vals.map(function(o){return o.p})),Math.max.apply(null,pay))*1.05,Y1=function(p){return T1+H1*(1-p/ymax)};
+ var s='<line class="ax" x1="'+L+'" x2="'+(W-R)+'" y1="'+Y1(0)+'" y2="'+Y1(0)+'"/>';
+ for(var g=0;g<=ymax;g+=ymax>30?10:5)s+='<text class="tx" x="'+(L-5)+'" y="'+(Y1(g)+4)+'" text-anchor="end">'+g+'</text>';
+ s+='<path d="'+path(xs.map(function(x,j){return[X(x),Y1(pay[j])]}))+'" fill="none" stroke="var(--muted)" stroke-dasharray="4 3"/>';
+ s+='<path d="'+path(xs.map(function(x,j){return[X(x),Y1(vals[j].p)]}))+'" fill="none" stroke="var(--a)" stroke-width="2.5"/>';
+ var o=bs(S,K,T,r,v,kind);s+='<circle cx="'+X(S)+'" cy="'+Y1(o.p)+'" r="5" fill="var(--c)"/><line x1="'+X(K)+'" x2="'+X(K)+'" y1="'+T1+'" y2="'+(T1+H1)+'" stroke="var(--line)"/>';
+ s+='<text class="lb" x="'+(L+8)+'" y="'+(T1+14)+'" style="fill:var(--a)">option value today</text><text class="tx" x="'+(L+8)+'" y="'+(T1+28)+'">dashed: value at expiry (payoff)</text>';
+ // delta panel
+ var dlo=kind==='call'?0:-1,Y2=function(d){return T2+H2*(1-(d-dlo))};
+ s+='<line class="ax" x1="'+L+'" x2="'+(W-R)+'" y1="'+Y2(dlo)+'" y2="'+Y2(dlo)+'"/><line class="ax" x1="'+L+'" x2="'+(W-R)+'" y1="'+Y2(dlo+1)+'" y2="'+Y2(dlo+1)+'"/>';
+ s+='<text class="tx" x="'+(L-5)+'" y="'+(Y2(dlo)+4)+'" text-anchor="end">'+dlo+'</text><text class="tx" x="'+(L-5)+'" y="'+(Y2(dlo+1)+4)+'" text-anchor="end">'+(dlo+1)+'</text>';
+ s+='<path d="'+path(xs.map(function(x,j){return[X(x),Y2(vals[j].delta)]}))+'" fill="none" stroke="var(--b)" stroke-width="2"/><text class="lb" x="'+(L+8)+'" y="'+(T2-4)+'" style="fill:var(--b)">delta (hedge ratio)</text>';
+ s+='<circle cx="'+X(S)+'" cy="'+Y2(o.delta)+'" r="4" fill="var(--c)"/>';
+ for(var k=60;k<=140;k+=20)s+='<text class="tx" x="'+X(k)+'" y="294" text-anchor="middle">'+k+'</text>';
+ $('bss').innerHTML=s;
+ $('bst').innerHTML='<tr><th>at spot '+S+'</th><th>price</th><th>intrinsic</th><th>time value</th><th>delta</th><th>gamma</th><th>vega (per 1 vol pt)</th><th>theta (per day)</th></tr><tr><td>'+kind+', K = 100</td><td>'+o.p.toFixed(2)+'</td><td>'+(kind==='call'?Math.max(S-K,0):Math.max(K-S,0)).toFixed(2)+'</td><td>'+(o.p-(kind==='call'?Math.max(S-K,0):Math.max(K-S,0))).toFixed(2)+'</td><td>'+o.delta.toFixed(3)+'</td><td>'+o.gamma.toFixed(4)+'</td><td>'+(o.vega/100).toFixed(3)+'</td><td>'+(o.theta/365).toFixed(3)+'</td></tr>';
+ $('bsm').innerHTML='Shrink the days to expiry: the value curve folds onto the payoff and delta becomes a step, which is why options close to expiry and close to the money are the hardest to hedge (gamma is largest there). Raise the volatility: every option gets more valuable, calls and puts alike. A put deep in the money with a high interest rate can be worth <i>less</i> than its intrinsic value: that is the case where an American put would be exercised early.'}
+['kind','s','vol','t','r'].forEach(function(i){$(i).oninput=drawBS;$(i).onchange=drawBS});drawBS();
+// ---------- tab 2
+var seed=1,dhSeed=7;function rnd(){seed|=0;seed=seed+0x6D2B79F5|0;var t=Math.imul(seed^seed>>>15,1|seed);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}
+function randn(){var u=0,v=0;while(u===0)u=rnd();while(v===0)v=rnd();return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v)}
+function drawDH(){var si=+$('iv').value,sr=+$('rvol').value,n=+$('reb').value;$('ivv').textContent=(si*100).toFixed(0)+'%';$('rvv').textContent=(sr*100).toFixed(0)+'%';
+ var S0=100,K=100,T=21/252,r=0.04,P=600,dt=T/n,prem=bs(S0,K,T,r,si,'call').p,pn=[];seed=dhSeed;
+ for(var p=0;p<P;p++){var S=S0,cash=prem,d=0;for(var i=0;i<n;i++){var tau=T-i*dt,nd=bs(S,K,tau,r,si,'call').delta;cash-=(nd-d)*S;d=nd;cash*=Math.exp(r*dt);S*=Math.exp((r-sr*sr/2)*dt+sr*Math.sqrt(dt)*randn())}pn.push(cash+d*S-Math.max(S-K,0))}
+ var mu=pn.reduce(function(a,b){return a+b})/P,sd=Math.sqrt(pn.reduce(function(a,b){return a+(b-mu)*(b-mu)},0)/(P-1)),vega=bs(S0,K,T,r,si,'call').vega;
+ var lo=-3,hi=2,bins=50,c=new Array(bins).fill(0);pn.forEach(function(v){var k=Math.floor((Math.max(lo,Math.min(hi-1e-9,v))-lo)/(hi-lo)*bins);c[k]++});var mx=Math.max.apply(null,c);
+ var W=700,H=250,L=30,T0=14,B=34,bw=(W-L-10)/bins,X=function(v){return L+(W-L-10)*(v-lo)/(hi-lo)},s='';
+ c.forEach(function(v,i){var h=(H-T0-B)*v/mx,mid=lo+(i+0.5)*(hi-lo)/bins;s+='<rect x="'+(L+i*bw)+'" y="'+(H-B-h)+'" width="'+(bw-1)+'" height="'+h+'" fill="'+(mid>=0?'var(--a)':'var(--bad)')+'" opacity=".65"/>'});
+ s+='<line x1="'+X(0)+'" x2="'+X(0)+'" y1="'+T0+'" y2="'+(H-B)+'" stroke="var(--ink)"/><line x1="'+X(mu)+'" x2="'+X(mu)+'" y1="'+T0+'" y2="'+(H-B)+'" stroke="var(--c)" stroke-width="2.5"/><text class="lb" x="'+(X(mu)+5)+'" y="'+(T0+10)+'" style="fill:var(--c)">mean '+mu.toFixed(2)+'</text>';
+ for(var k=lo;k<=hi;k+=0.5)s+='<text class="tx" x="'+X(k)+'" y="'+(H-B+14)+'" text-anchor="middle">'+k+'</text>';
+ s+='<text class="tx" x="'+((W+L)/2)+'" y="'+(H-4)+'" text-anchor="middle">P&amp;L at expiry of a short 21-day at-the-money call (premium '+prem.toFixed(2)+'), '+P+' paths; values beyond the axis are piled at the edges</text>';$('dhs').innerHTML=s;
+ $('dhm').innerHTML='Mean P&amp;L <b>'+mu.toFixed(2)+'</b> (vega rule: '+(vega*(si-sr)).toFixed(2)+'), standard deviation <b>'+sd.toFixed(2)+'</b> = '+(sd/prem*100).toFixed(0)+'% of the premium. With equal vols the mean is near zero and the spread shrinks like 1/√(rebalances). Make realised volatility exceed implied: the whole histogram shifts left, whichever way the market went. That is what it means to be <b>short volatility</b>.'}
+['iv','rvol','reb'].forEach(function(i){$(i).oninput=drawDH;$(i).onchange=drawDH});$('dhn').onclick=function(){dhSeed=Math.floor(Math.random()*1e9);drawDH()};drawDH();
+// ---------- tab 3: Heston via the Lewis formula, complex numbers as [re, im]
+function cadd(a,b){return[a[0]+b[0],a[1]+b[1]]}function csub(a,b){return[a[0]-b[0],a[1]-b[1]]}function cmul(a,b){return[a[0]*b[0]-a[1]*b[1],a[0]*b[1]+a[1]*b[0]]}
+function cdiv(a,b){var d=b[0]*b[0]+b[1]*b[1];return[(a[0]*b[0]+a[1]*b[1])/d,(a[1]*b[0]-a[0]*b[1])/d]}function cexp(a){var e=Math.exp(a[0]);return[e*Math.cos(a[1]),e*Math.sin(a[1])]}
+function clog(a){return[Math.log(Math.hypot(a[0],a[1])),Math.atan2(a[1],a[0])]}function csqrt(a){var m=Math.hypot(a[0],a[1]);var re=Math.sqrt((m+a[0])/2),im=Math.sqrt(Math.max(0,(m-a[0])/2));return[re,a[1]<0?-im:im]}
+function hphi(u,T,v0,ka,th,sg,rh){ // u complex
+ var iu=[-u[1],u[0]],b=csub([ka,0],cmul([rh*sg,0],iu)),d=csqrt(cadd(cmul(b,b),cmul([sg*sg,0],cadd(iu,cmul(u,u))))),g=cdiv(csub(b,d),cadd(b,d)),e=cexp(cmul([-T,0],d));
+ var one=[1,0],C=cmul([ka*th/(sg*sg),0],csub(cmul(csub(b,d),[T,0]),cmul([2,0],clog(cdiv(csub(one,cmul(g,e)),csub(one,g)))))),D=cmul(cdiv(csub(b,d),[sg*sg,0]),cdiv(csub(one,e),csub(one,cmul(g,e))));
+ return cexp(cadd(C,cmul(D,[v0,0])))}
+function hcall(x,T,v0,ka,th,sg,rh){var s=Math.sqrt(Math.max(Math.min(v0,th),1e-4)*T),U=14/s,N=600,h=U/N,sum=0;
+ for(var j=0;j<=N;j++){var u=Math.max(j*h,1e-9),f=cmul(cexp([0,-u*x]),hphi([u,-0.5],T,v0,ka,th,sg,rh))[0]/(u*u+0.25);sum+=(j===0||j===N?0.5:1)*f}
+ return 1-Math.exp(x/2)/Math.PI*sum*h}
+function bsf(x,T,v){var sT=v*Math.sqrt(T),K=Math.exp(x),d1=(-x+sT*sT/2)/sT;return Phi(d1)-K*Phi(d1-sT)}
+function ivOf(c,x,T){if(!(c>Math.max(1-Math.exp(x),0)+1e-10)||c>=1)return NaN;var lo=1e-3,hi=3;for(var i=0;i<50;i++){var m=(lo+hi)/2;if(bsf(x,T,m)>c)hi=m;else lo=m}return(lo+hi)/2}
+var HD=window.OPTIONS_DATA;
+function drawHS(){var v0=Math.pow(+$('v0').value,2),th=Math.pow(+$('th').value,2),ka=+$('ka').value,sg=+$('sg').value,rh=+$('rh').value,T=HD.T;
+ $('v0v').textContent=(Math.sqrt(v0)*100).toFixed(1)+'%';$('thv').textContent=(Math.sqrt(th)*100).toFixed(1)+'%';$('kav').textContent=ka.toFixed(1);$('sgv').textContent=sg.toFixed(2);$('rhv').textContent=rh.toFixed(2);
+ var xs=[];for(var i=0;i<=50;i++)xs.push(-0.3+0.42*i/50);var mod=xs.map(function(x){return ivOf(hcall(x,T,v0,ka,th,sg,rh),x,T)});
+ var W=700,H=280,L=40,R=10,T0=10,B=30,ylo=5,yhi=45,X=function(x){return L+(W-L-R)*(Math.exp(x)-Math.exp(-0.3))/(Math.exp(0.12)-Math.exp(-0.3))},Y=function(v){return T0+(H-T0-B)*(yhi-Math.max(ylo,Math.min(yhi,v*100)))/(yhi-ylo)};
+ var s='';for(var g=10;g<=40;g+=10)s+='<line class="ax" x1="'+L+'" x2="'+(W-R)+'" y1="'+Y(g/100)+'" y2="'+Y(g/100)+'"/><text class="tx" x="'+(L-5)+'" y="'+(Y(g/100)+4)+'" text-anchor="end">'+g+'%</text>';
+ [0.75,0.8,0.85,0.9,0.95,1,1.05,1.1].forEach(function(k){s+='<text class="tx" x="'+X(Math.log(k))+'" y="'+(H-12)+'" text-anchor="middle">'+k.toFixed(2)+'</text>'});
+ s+='<text class="tx" x="'+((W+L)/2)+'" y="'+(H-1)+'" text-anchor="middle">strike / forward</text>';
+ HD.x.forEach(function(x,j){s+='<circle cx="'+X(x)+'" cy="'+Y(HD.iv[j])+'" r="3.5" fill="var(--muted)" opacity=".8"/>'});
+ var pts=[];xs.forEach(function(x,j){if(isFinite(mod[j]))pts.push([X(x),Y(mod[j])])});s+='<path d="'+path(pts)+'" fill="none" stroke="var(--a)" stroke-width="2.5"/>';
+ s+='<text class="lb" x="'+(W-R-6)+'" y="'+(T0+14)+'" text-anchor="end" style="fill:var(--a)">Heston</text><text class="tx" x="'+(W-R-6)+'" y="'+(T0+28)+'" text-anchor="end">dots: SPY '+HD.expiry+' ('+Math.round(T*365)+' days), 3 Nov 2026</text>';
+ $('hss').innerHTML=s;var se=0,n=0;HD.x.forEach(function(x,j){var m=ivOf(hcall(x,T,v0,ka,th,sg,rh),x,T);if(isFinite(m)){se+=(m-HD.iv[j])*(m-HD.iv[j]);n++}});
+ $('hsm').innerHTML='RMSE against the market: <b>'+(n?(100*Math.sqrt(se/n)).toFixed(2):'–')+' vol points</b>. Start with ρ = 0: the smile is symmetric. Pull ρ negative and it tilts into a skew; raise σ and it bends; move √v₀ and the whole curve shifts. Try to beat the calibrated fit by hand, then press the button. Many different (κ, σ) pairs give almost the same curve: that is the identification problem from the chapter.'}
+['v0','th','ka','sg','rh'].forEach(function(i){$(i).oninput=drawHS});
+$('hcal').onclick=function(){var f=HD.fit;$('v0').value=Math.sqrt(f.v0);$('th').value=Math.sqrt(f.theta);$('ka').value=f.kappa;$('sg').value=Math.min(2.5,f.sigma);$('rh').value=f.rho;drawHS()};drawHS();
+</script></body></html>

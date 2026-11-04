@@ -358,4 +358,4 @@ With pure random walks the screen passes between 5 and 11 of the 253 pairs (the 
 
 ## What's next
 
-All strategies so far trade the assets themselves. Chapter 8 moves to **options**, whose prices depend on volatility rather than direction, builds the pricing machinery (trees, Monte Carlo, Black–Scholes, Heston), simulates delta hedging, and trains a neural network to price options a thousand times faster than the model it learns from.
+All strategies so far trade the assets themselves. Chapter 8 moves to **options**, whose prices depend on volatility rather than direction, builds the pricing machinery (trees, Monte Carlo, Black–Scholes, Heston), simulates delta hedging, and trains a neural network, written from scratch in NumPy, to price options about a hundred times faster than the model it learns from.

@@ -107,9 +107,9 @@
           "n": "8",
           "title": "Options, Volatility and Neural Pricers",
           "path": "financial-ml/08-options-and-neural-pricers/",
-          "ready": false,
+          "ready": true,
           "kind": "Project",
-          "desc": "Black–Scholes, trees and Monte Carlo, implied volatility, a delta-hedging simulation, the Heston model, and a neural-network surrogate that prices options a thousand times faster."
+          "desc": "Black–Scholes, trees and Monte Carlo, implied volatility, a delta-hedging simulation, the Heston model, and a neural-network surrogate, written from scratch, that prices options about a hundred times faster."
         },
         {
           "n": "9",
