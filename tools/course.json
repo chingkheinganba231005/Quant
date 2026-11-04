@@ -59,7 +59,7 @@
           "n": "2",
           "title": "A Backtester from Scratch: Trend Following",
           "path": "financial-ml/02-backtesting-trend-following/",
-          "ready": false,
+          "ready": true,
           "kind": "Project",
           "desc": "Build an honest vectorised backtester, test time-series momentum on real ETFs, add costs and volatility targeting, walk forward, and measure how much of the result is luck."
         },
