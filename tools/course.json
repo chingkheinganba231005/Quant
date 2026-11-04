@@ -75,7 +75,7 @@
           "n": "4",
           "title": "Portfolio Construction out of Sample",
           "path": "financial-ml/04-portfolio-construction/",
-          "ready": false,
+          "ready": true,
           "kind": "Project",
           "desc": "Mean–variance and why it fails on real estimates, shrinkage, minimum variance, risk parity and hierarchical risk parity, compared in a walk-forward test."
         },

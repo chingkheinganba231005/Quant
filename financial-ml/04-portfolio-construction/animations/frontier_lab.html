@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Frontier Lab</title>
+<style>
+:root{--bg:#fff;--ink:#1d2128;--muted:#5d6470;--line:#d9d6cc;--on:#0f6b5c;--on-ink:#fff;--t:#0f6b5c;--e:#3a6fd0;--r:#c8372d;--soft:#e2f1ed;color-scheme:light}
+:root[data-theme=dark]{--bg:#181c22;--ink:#e7e9ee;--muted:#a2a9b6;--line:#2e343e;--on:#4fc7ad;--on-ink:#0c1512;--t:#4fc7ad;--e:#77a3f0;--r:#f2786e;--soft:#16302b;color-scheme:dark}
+@media (prefers-color-scheme:dark){:root:not([data-theme=light]){--bg:#181c22;--ink:#e7e9ee;--muted:#a2a9b6;--line:#2e343e;--on:#4fc7ad;--on-ink:#0c1512;--t:#4fc7ad;--e:#77a3f0;--r:#f2786e;--soft:#16302b;color-scheme:dark}}
+*{box-sizing:border-box}body{margin:0;padding:12px 14px;background:var(--bg);color:var(--ink);font:14.5px/1.45 Inter,system-ui,sans-serif}
+.ctl{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:6px 16px}
+label{display:flex;flex-direction:column;font-size:12.5px;color:var(--muted)}label b{color:var(--ink);font-size:13.5px}input[type=range]{width:100%}
+button{font:inherit;font-size:13px;border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:999px;padding:5px 12px;cursor:pointer;margin-top:8px}
+svg{width:100%;height:auto;display:block;margin-top:6px}.ax{stroke:var(--line)}.tx{fill:var(--muted);font:11px Inter,sans-serif}.lb{font:600 12px Inter,sans-serif}
+table{border-collapse:collapse;font:13px Inter,sans-serif;font-variant-numeric:tabular-nums;width:100%;margin-top:6px}th,td{padding:4px 8px;border-bottom:1px solid var(--line);text-align:right}th:first-child,td:first-child{text-align:left}
+.msg{font-size:13.5px;background:var(--soft);border-radius:8px;padding:8px 12px;margin-top:6px}
+</style></head><body>
+<div class="ctl">
+  <label>years of data used to estimate: <b id="tv"></b><input type="range" id="T" min="1" max="40" value="5"></label>
+  <label>shrink covariance towards diagonal: <b id="cv"></b><input type="range" id="sc" min="0" max="1" step="0.05" value="0"></label>
+  <label>shrink means towards their average: <b id="mv"></b><input type="range" id="sm" min="0" max="1" step="0.05" value="0"></label>
+  <div><button id="nw">↻ draw a new sample of history</button></div>
+</div>
+<svg id="pl" viewBox="0 0 700 330"></svg>
+<table id="tab"></table>
+<div class="msg" id="msg"></div>
+<script src="data.js"></script>
+<script>
+try{var pt=parent.document.documentElement.dataset.theme;if(pt)document.documentElement.dataset.theme=pt}catch(e){}
+var D=window.FRONTIER_DATA,N=D.names.length,MU=D.mu,S=D.cov,seed=11;
+function rnd(){seed|=0;seed=seed+0x6D2B79F5|0;var t=Math.imul(seed^seed>>>15,1|seed);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}
+function randn(){var u=0,v=0;while(u===0)u=rnd();while(v===0)v=rnd();return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v)}
+function chol(A){var n=A.length,L=A.map(function(r){return r.map(function(){return 0})});for(var i=0;i<n;i++)for(var j=0;j<=i;j++){var s=A[i][j];for(var k=0;k<j;k++)s-=L[i][k]*L[j][k];L[i][j]=i===j?Math.sqrt(Math.max(s,1e-12)):s/L[j][j]}return L}
+function solve(A,b){var n=b.length,M=A.map(function(r,i){return r.concat([b[i]])});for(var c=0;c<n;c++){var p=c;for(var r=c+1;r<n;r++)if(Math.abs(M[r][c])>Math.abs(M[p][c]))p=r;var tmp=M[c];M[c]=M[p];M[p]=tmp;for(r=c+1;r<n;r++){var f=M[r][c]/M[c][c];for(var k=c;k<=n;k++)M[r][k]-=f*M[c][k]}}var x=new Array(n).fill(0);for(r=n-1;r>=0;r--){var s=M[r][n];for(k=r+1;k<n;k++)s-=M[r][k]*x[k];x[r]=s/M[r][r]}return x}
+function dot(a,b){return a.reduce(function(s,x,i){return s+x*b[i]},0)}function mv(A,x){return A.map(function(r){return dot(r,x)})}
+function abc(mu,C){var one=mu.map(function(){return 1}),a=solve(C,one),b=solve(C,mu);return{A:dot(one,a),B:dot(one,b),C:dot(mu,b),Si1:a,Simu:b}}
+function wOn(mu,C,m){var k=abc(mu,C),D=k.A*k.C-k.B*k.B,l1=(k.A*m-k.B)/D,l2=(k.C-k.B*m)/D;return k.Simu.map(function(x,i){return l1*x+l2*k.Si1[i]})}
+var L=chol(S),draws=null;
+function sample(T){draws=[];var n=Math.round(T*252);for(var t=0;t<n;t++){var z=[];for(var i=0;i<N;i++)z.push(randn());draws.push(mv(L,z).map(function(x,i){return x/Math.sqrt(252)+MU[i]/252}))}}
+function run(){var T=+document.getElementById('T').value,sc=+document.getElementById('sc').value,sm=+document.getElementById('sm').value;document.getElementById('tv').textContent=T;document.getElementById('cv').textContent=(sc*100).toFixed(0)+'%';document.getElementById('mv').textContent=(sm*100).toFixed(0)+'%';
+ if(!draws||draws.length!==Math.round(T*252))sample(T);var n=draws.length,m=new Array(N).fill(0);draws.forEach(function(x){x.forEach(function(v,i){m[i]+=v})});m=m.map(function(v){return v/n});
+ var C=[];for(var i=0;i<N;i++){C.push([]);for(var j=0;j<N;j++){var s=0;draws.forEach(function(x){s+=(x[i]-m[i])*(x[j]-m[j])});C[i].push(s/(n-1)*252)}}
+ var Cs=C.map(function(r,i){return r.map(function(v,j){return i===j?v:(1-sc)*v})}),mu=m.map(function(v){return v*252}),avg=mu.reduce(function(a,b){return a+b})/N,mus=mu.map(function(v){return (1-sm)*v+sm*avg});
+ // curves
+ var tk=abc(MU,S),ek=abc(mus,Cs),targets=[];for(var q=-0.05;q<=0.25;q+=0.0025)targets.push(q);
+ function sig(k,mm){var D=k.A*k.C-k.B*k.B;return Math.sqrt((k.A*mm*mm-2*k.B*mm+k.C)/D)}
+ var tc=targets.map(function(q){return[sig(tk,q),q]}),ec=targets.map(function(q){return[sig(ek,q),q]}),rc=targets.map(function(q){var w=wOn(mus,Cs,q);return[Math.sqrt(dot(w,mv(S,w))),dot(w,MU)]});
+ var W=700,H=330,Lf=50,Rr=14,Tp=12,B=34,xmax=0.35,ymin=-0.05,ymax=0.25;function X(v){return Lf+(W-Lf-Rr)*v/xmax}function Y(v){return Tp+(H-Tp-B)*(ymax-v)/(ymax-ymin)}
+ function path(arr,c,w,dash){return '<path d="'+arr.filter(function(p){return p[0]<xmax&&p[1]>ymin&&p[1]<ymax}).map(function(p,i){return(i?'L':'M')+X(p[0]).toFixed(1)+' '+Y(p[1]).toFixed(1)}).join('')+'" fill="none" stroke="'+c+'" stroke-width="'+w+'"'+(dash?' stroke-dasharray="5 4"':'')+'/>'}
+ var s='';for(var g=0;g<=0.35;g+=0.05)s+='<line class="ax" x1="'+X(g)+'" x2="'+X(g)+'" y1="'+Tp+'" y2="'+(H-B)+'"/><text class="tx" x="'+X(g)+'" y="'+(H-B+15)+'" text-anchor="middle">'+(g*100).toFixed(0)+'%</text>';
+ for(g=-0.05;g<=0.25;g+=0.05)s+='<line class="ax" x1="'+Lf+'" x2="'+(W-Rr)+'" y1="'+Y(g)+'" y2="'+Y(g)+'"/><text class="tx" x="'+(Lf-5)+'" y="'+(Y(g)+4)+'" text-anchor="end">'+(g*100).toFixed(0)+'%</text>';
+ s+=path(tc,'var(--t)',2.4)+path(ec,'var(--e)',2,true)+path(rc,'var(--r)',2.2);
+ for(i=0;i<N;i++){var sd=Math.sqrt(S[i][i]);s+='<circle cx="'+X(sd)+'" cy="'+Y(MU[i])+'" r="4" fill="var(--t)"/><text class="tx" x="'+(X(sd)+6)+'" y="'+(Y(MU[i])+4)+'">'+D.names[i]+'</text>'}
+ s+='<text class="lb" x="'+(Lf+8)+'" y="'+(Tp+14)+'" style="fill:var(--t)">true frontier (unknowable)</text><text class="lb" x="'+(Lf+8)+'" y="'+(Tp+30)+'" style="fill:var(--e)">estimated frontier (what the optimiser believes)</text><text class="lb" x="'+(Lf+8)+'" y="'+(Tp+46)+'" style="fill:var(--r)">what the estimated portfolios really deliver</text>';
+ s+='<text class="tx" x="'+((W+Lf)/2)+'" y="'+(H-4)+'" text-anchor="middle">volatility (annual)</text><text class="tx" transform="translate(12 '+(H/2)+') rotate(-90)" text-anchor="middle">expected excess return</text>';document.getElementById('pl').innerHTML=s;
+ var wt=tk.Simu.map(function(x){return x/tk.B}),we=ek.Simu.map(function(x){return x/ek.B}),wg=ek.Si1.map(function(x){return x/ek.A}),eq=MU.map(function(){return 1/N});
+ function row(name,w){var r=dot(w,MU),v=Math.sqrt(dot(w,mv(S,w)));return '<tr><td>'+name+'</td><td>'+w.map(function(x){return (x*100).toFixed(0)+'%'}).join(' · ')+'</td><td>'+(r/v).toFixed(2)+'</td></tr>'}
+ document.getElementById('tab').innerHTML='<tr><th>portfolio</th><th>weights ('+D.names.join(', ')+')</th><th>TRUE Sharpe</th></tr>'+row('true tangency',wt)+row('estimated tangency',we)+row('estimated min variance',wg)+row('equal weight 1/N',eq);
+ var shE=dot(we,MU)/Math.sqrt(dot(we,mv(S,we))),shEb=dot(we,mus)/Math.sqrt(dot(we,mv(Cs,we)));
+ document.getElementById('msg').innerHTML='The optimiser believes its tangency portfolio has a Sharpe ratio of <b>'+shEb.toFixed(2)+'</b>; it really has <b>'+shE.toFixed(2)+'</b>. With '+T+' year'+(T>1?'s':'')+' of data the means are measured with an error of about ±'+(16/Math.sqrt(T)).toFixed(0)+'% a year. Try shrinking the means.'}
+['T','sc','sm'].forEach(function(id){document.getElementById(id).oninput=run});document.getElementById('nw').onclick=function(){seed=Math.floor(Math.random()*1e9);draws=null;run()};run();
+</script></body></html>
