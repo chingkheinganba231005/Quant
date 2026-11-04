@@ -67,7 +67,7 @@
           "n": "3",
           "title": "Forecasting Volatility",
           "path": "financial-ml/03-forecasting-volatility/",
-          "ready": false,
+          "ready": true,
           "kind": "Project",
           "desc": "Realised volatility, EWMA, GARCH(1,1) fitted by maximum likelihood from scratch, HAR and gradient boosting, judged with the right loss, then used to size positions."
         },
