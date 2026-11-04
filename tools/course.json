@@ -83,7 +83,7 @@
           "n": "5",
           "title": "Financial Machine Learning Done Right",
           "path": "financial-ml/05-financial-ml-done-right/",
-          "ready": false,
+          "ready": true,
           "kind": "Theory + project",
           "desc": "Labels (fixed horizon, triple barrier), meta-labelling, overlapping samples, purged and embargoed cross-validation, feature importance and the probability of backtest overfitting."
         },
