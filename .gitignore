@@ -2,3 +2,6 @@
 __pycache__/
 .ipynb_checkpoints/
 *.pyc
+financial-ml/10-capstone/paper_trader/ledger.csv
+financial-ml/10-capstone/paper_trader/hmm_params.json
+financial-ml/10-capstone/paper_trader/replay_*
