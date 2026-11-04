@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Factor Lab</title>
+<style>
+:root{--bg:#fff;--ink:#1d2128;--muted:#5d6470;--line:#d9d6cc;--on:#0f6b5c;--on-ink:#fff;--a:#0f6b5c;--b:#3a6fd0;--c:#e08a2c;--bad:#c8372d;--soft:#e2f1ed;color-scheme:light}
+:root[data-theme=dark]{--bg:#181c22;--ink:#e7e9ee;--muted:#a2a9b6;--line:#2e343e;--on:#4fc7ad;--on-ink:#0c1512;--a:#4fc7ad;--b:#77a3f0;--c:#f0a75a;--bad:#f2786e;--soft:#16302b;color-scheme:dark}
+@media (prefers-color-scheme:dark){:root:not([data-theme=light]){--bg:#181c22;--ink:#e7e9ee;--muted:#a2a9b6;--line:#2e343e;--on:#4fc7ad;--on-ink:#0c1512;--a:#4fc7ad;--b:#77a3f0;--c:#f0a75a;--bad:#f2786e;--soft:#16302b;color-scheme:dark}}
+*{box-sizing:border-box}body{margin:0;padding:12px 14px;background:var(--bg);color:var(--ink);font:14.5px/1.45 Inter,system-ui,sans-serif}
+.tabs{display:flex;gap:6px;margin-bottom:10px}button{font:inherit;font-size:13.5px;border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:999px;padding:5px 13px;cursor:pointer}button.on{background:var(--on);border-color:var(--on);color:var(--on-ink)}
+.pane{display:none}.pane.on{display:block}
+.ctl{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:6px 16px}label{display:flex;flex-direction:column;font-size:12.5px;color:var(--muted)}label b{color:var(--ink);font-size:13.5px}input[type=range]{width:100%}
+select{font:inherit;padding:4px 6px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink)}
+svg{width:100%;height:auto;display:block;margin-top:6px}.ax{stroke:var(--line)}.tx{fill:var(--muted);font:11px Inter,sans-serif}.lb{font:600 12px Inter,sans-serif}
+.msg{font-size:13.5px;background:var(--soft);border-radius:8px;padding:8px 12px;margin-top:6px}
+table{border-collapse:collapse;font:13px Inter,sans-serif;font-variant-numeric:tabular-nums;width:100%;margin-top:6px}th,td{padding:4px 8px;border-bottom:1px solid var(--line);text-align:right}th:first-child,td:first-child{text-align:left}
+</style></head><body>
+<div class="tabs"><button class="on" data-t="law">Fundamental law</button><button data-t="real">Real signals</button></div>
+<section class="pane on" id="law">
+  <div class="ctl">
+    <label>information coefficient (IC): <b id="icv"></b><input type="range" id="ic" min="0" max="0.1" step="0.005" value="0.03"></label>
+    <label>independent assets (breadth per month): <b id="nv"></b><input type="range" id="n" min="1" max="500" value="49"></label>
+    <label>years observed: <b id="yv"></b><input type="range" id="y" min="1" max="30" value="10"></label>
+  </div>
+  <svg id="ls" viewBox="0 0 700 260"></svg><div class="msg" id="lm"></div>
+</section>
+<section class="pane" id="real">
+  <div class="ctl">
+    <label>strategy<select id="sel"></select></label>
+    <label>start year: <b id="sv"></b><input type="range" id="sy" min="1970" max="2015" value="1970"></label>
+    <label>volatility scaling (10% target)<select id="vs"><option value="0">off</option><option value="1">on</option></select></label>
+  </div>
+  <svg id="rs" viewBox="0 0 700 260"></svg><table id="rt"></table>
+</section>
+<script src="data.js"></script>
+<script>
+try{var pt=parent.document.documentElement.dataset.theme;if(pt)document.documentElement.dataset.theme=pt}catch(e){}
+document.querySelectorAll('.tabs button').forEach(function(b){b.onclick=function(){document.querySelectorAll('.tabs button').forEach(function(x){x.classList.toggle('on',x===b)});document.querySelectorAll('.pane').forEach(function(p){p.classList.toggle('on',p.id===b.dataset.t)})}});
+function $(i){return document.getElementById(i)}var seed=4;function rnd(){seed|=0;seed=seed+0x6D2B79F5|0;var t=Math.imul(seed^seed>>>15,1|seed);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}
+function randn(){var u=0,v=0;while(u===0)u=rnd();while(v===0)v=rnd();return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v)}
+function law(){var ic=+$('ic').value,N=+$('n').value,Y=+$('y').value;$('icv').textContent=ic.toFixed(3);$('nv').textContent=N;$('yv').textContent=Y;
+ // each month: returns ~ N(0,1) per asset, forecasts with correlation ic; portfolio = forecast-weighted; monthly IR = mean/sd*sqrt(12)
+ seed=4;var sims=300,irs=[];for(var s=0;s<sims;s++){var pr=[];for(var m=0;m<Y*12;m++){var pnl=0;for(var i=0;i<N;i++){var r=randn(),f=ic*r+Math.sqrt(1-ic*ic)*randn();pnl+=f*r}pr.push(pnl/Math.sqrt(N))}var mu=pr.reduce(function(a,b){return a+b})/pr.length,sd=Math.sqrt(pr.reduce(function(a,b){return a+(b-mu)*(b-mu)},0)/(pr.length-1));irs.push(mu/sd*Math.sqrt(12))}
+ var theory=ic*Math.sqrt(12*N),lo=Math.min(-1,Math.min.apply(null,irs)),hi=Math.max(theory+1,Math.max.apply(null,irs)),bins=40,c=new Array(bins).fill(0);irs.forEach(function(v){var k=Math.floor((v-lo)/(hi-lo)*bins);if(k>=0&&k<bins)c[k]++});var mx=Math.max.apply(null,c);
+ var W=700,H=260,L=30,T=16,B=30,bw=(W-L-10)/bins,s2='';c.forEach(function(v,i){var h=(H-T-B)*v/mx;s2+='<rect x="'+(L+i*bw)+'" y="'+(H-B-h)+'" width="'+(bw-1)+'" height="'+h+'" fill="var(--b)" opacity=".6"/>'});
+ function X(v){return L+(W-L-10)*(v-lo)/(hi-lo)}s2+='<line x1="'+X(theory)+'" x2="'+X(theory)+'" y1="'+T+'" y2="'+(H-B)+'" stroke="var(--a)" stroke-width="2.5"/><text class="lb" x="'+(X(theory)+5)+'" y="'+(T+12)+'" style="fill:var(--a)">law: IC×√(12N) = '+theory.toFixed(2)+'</text>';
+ s2+='<line x1="'+X(0)+'" x2="'+X(0)+'" y1="'+T+'" y2="'+(H-B)+'" stroke="var(--bad)"/>';for(var k=Math.ceil(lo);k<=Math.floor(hi);k++)s2+='<text class="tx" x="'+X(k)+'" y="'+(H-B+14)+'" text-anchor="middle">'+k+'</text>';s2+='<text class="tx" x="'+((W+L)/2)+'" y="'+(H-4)+'" text-anchor="middle">annual information ratio realised over '+Y+' years (300 simulated histories)</text>';$('ls').innerHTML=s2;
+ var neg=irs.filter(function(v){return v<0}).length/sims;$('lm').innerHTML='With IC '+ic.toFixed(3)+' on '+N+' independent assets the law predicts an IR of <b>'+theory.toFixed(2)+'</b>. In '+(neg*100).toFixed(0)+'% of the simulated '+Y+'-year histories the realised IR was negative. Try IC 0.10 on one asset against IC 0.02 on 300 assets. (Real assets are correlated, so their effective breadth is smaller than their number.)'}
+['ic','n','y'].forEach(function(i){$(i).oninput=law});law();
+var D=window.FACTOR_DATA;Object.keys(D.series).forEach(function(k){var o=document.createElement('option');o.value=k;o.textContent=k+(D.ic[k]!==undefined?'  (IC '+D.ic[k].toFixed(3)+')':'');$('sel').appendChild(o)});
+function real(){var k=$('sel').value,SY=+$('sy').value,vs=$('vs').value==='1';$('sv').textContent=SY;var x=[],d=[],raw=D.series[k];
+ for(var i=0;i<D.dates.length;i++){if(+D.dates[i].slice(0,4)<SY||raw[i]===null)continue;var v=raw[i];if(vs){var w=[];for(var j=Math.max(0,i-6);j<i;j++)if(raw[j]!==null)w.push(raw[j]);if(w.length<6)continue;var m=w.reduce(function(a,b){return a+b})/w.length,sd=Math.sqrt(w.reduce(function(a,b){return a+(b-m)*(b-m)},0)/(w.length-1))*Math.sqrt(12);v=Math.min(2,0.10/sd)*v}x.push(v);d.push(D.dates[i])}
+ var eq=[1];x.forEach(function(v){eq.push(eq[eq.length-1]*(1+v))});var lo=Math.log(Math.min.apply(null,eq)),hi=Math.log(Math.max.apply(null,eq)),W=700,H=260,L=44,T=10,B=24;function X(i){return L+(W-L-10)*i/(eq.length-1)}function Y(v){return T+(H-T-B)*(hi-Math.log(v))/(hi-lo||1)}
+ var s='';[0.5,1,2,4,8,16,32,64].forEach(function(v){if(Math.log(v)>=lo&&Math.log(v)<=hi)s+='<line class="ax" x1="'+L+'" x2="'+(W-10)+'" y1="'+Y(v)+'" y2="'+Y(v)+'"/><text class="tx" x="'+(L-5)+'" y="'+(Y(v)+4)+'" text-anchor="end">$'+v+'</text>'});
+ for(var t=0;t<d.length;t+=60)s+='<text class="tx" x="'+X(t)+'" y="'+(H-6)+'" text-anchor="middle">'+d[t].slice(0,4)+'</text>';s+='<path d="'+eq.map(function(v,i){return(i?'L':'M')+X(i).toFixed(1)+' '+Y(v).toFixed(1)}).join('')+'" fill="none" stroke="var(--a)" stroke-width="2"/>';$('rs').innerHTML=s;
+ var n=x.length,mu=x.reduce(function(a,b){return a+b})/n,sd=Math.sqrt(x.reduce(function(a,b){return a+(b-mu)*(b-mu)},0)/(n-1)),pk=1,mdd=0,e=1;x.forEach(function(v){e*=1+v;pk=Math.max(pk,e);mdd=Math.min(mdd,e/pk-1)});var sk=x.reduce(function(a,b){return a+Math.pow((b-mu)/sd,3)},0)/n;
+ $('rt').innerHTML='<tr><th>'+k+(vs?' (vol-scaled)':'')+'</th><th>annual return</th><th>vol</th><th>Sharpe</th><th>max DD</th><th>skew</th><th>worst month</th></tr><tr><td>'+d[0]+' → '+d[d.length-1]+'</td><td>'+(mu*1200).toFixed(1)+'%</td><td>'+(sd*Math.sqrt(12)*100).toFixed(1)+'%</td><td>'+(mu/sd*Math.sqrt(12)).toFixed(2)+'</td><td>'+(mdd*100).toFixed(0)+'%</td><td>'+sk.toFixed(2)+'</td><td>'+(Math.min.apply(null,x)*100).toFixed(1)+'%</td></tr>'}
+['sel','sy','vs'].forEach(function(i){$(i).oninput=real;$(i).onchange=real});real();
+</script></body></html>

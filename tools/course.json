@@ -91,7 +91,7 @@
           "n": "6",
           "title": "Cross-Sectional Factors and ML Ranking",
           "path": "financial-ml/06-cross-sectional-ml/",
-          "ready": false,
+          "ready": true,
           "kind": "Project",
           "desc": "Momentum, reversal and low-risk signals across a stock universe, information coefficients, Fama–MacBeth regressions, long–short portfolios, and ML rankers judged after costs."
         },
