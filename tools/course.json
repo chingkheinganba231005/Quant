@@ -99,7 +99,7 @@
           "n": "7",
           "title": "Pairs Trading and Statistical Arbitrage",
           "path": "financial-ml/07-pairs-trading/",
-          "ready": false,
+          "ready": true,
           "kind": "Project",
           "desc": "Cointegration and the ADF test from scratch, the Ornstein–Uhlenbeck spread, a Kalman-filter hedge ratio, and how fast relative-value edges decay."
         },

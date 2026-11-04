@@ -31,7 +31,7 @@ h2{font-size:clamp(1.45rem,3.2vw,1.85rem);margin:3rem 0 .8rem;padding-top:.6rem;
 h3{font-size:1.2rem;margin:2rem 0 .5rem}
 h4{font-size:1rem;margin:1.4rem 0 .4rem}
 p,li{max-width:72ch}
-code{font-family:var(--mono);font-size:.84em;background:var(--surface2);padding:.08em .35em;border-radius:4px}
+code{font-family:var(--mono);font-size:.84em;background:var(--surface2);padding:.08em .35em;border-radius:4px;overflow-wrap:anywhere}
 strong{font-weight:600}
 hr{border:0;border-top:1px solid var(--line);margin:2rem 0}
 /* top bar */
@@ -59,7 +59,7 @@ hr{border:0;border-top:1px solid var(--line);margin:2rem 0}
 /* code and outputs */
 pre{margin:1rem 0;overflow:auto;-webkit-overflow-scrolling:touch}
 pre.code{position:relative;background:var(--code-bg);color:var(--code-ink);border:1px solid var(--line);border-radius:10px;padding:14px 16px;font:14px/1.55 var(--mono)}
-pre.code code{background:none;padding:0;font-size:inherit}
+pre.code code{background:none;padding:0;font-size:inherit;overflow-wrap:normal}
 pre.out{background:var(--out-bg);border:1px dashed var(--line);border-radius:8px;padding:10px 14px;font:13.5px/1.5 var(--mono);color:var(--muted);margin-top:-.4rem}
 pre.out::before{content:"output";display:block;font:600 10px var(--sans);letter-spacing:.1em;text-transform:uppercase;color:var(--accent);margin-bottom:4px}
 .copy{position:absolute;top:8px;right:8px;font:600 11px var(--sans);background:var(--surface);color:var(--muted);border:1px solid var(--line);border-radius:6px;padding:3px 8px;cursor:pointer;opacity:0;transition:opacity .2s}
