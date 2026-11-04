@@ -121,3 +121,4 @@ figcaption{font:.88rem/1.5 var(--sans);color:var(--muted);margin-top:.5rem;text-
   .pager{flex-direction:column}
 }
 .toc-nb a::before{content:none!important}
+.content img{max-width:100%;height:auto}

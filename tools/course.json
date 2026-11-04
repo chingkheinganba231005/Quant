@@ -37,7 +37,7 @@
           "n": "T3",
           "title": "Plotting from Zero",
           "path": "toolkit/03-plotting-from-zero/",
-          "ready": false,
+          "ready": true,
           "desc": "Matplotlib’s figure and axes model, every common chart, dates, twin axes and annotations, publication styling, then seaborn for statistical plots and Plotly for interactive dashboards, ending with a full market report."
         }
       ]

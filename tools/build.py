@@ -202,7 +202,7 @@ def md_to_html(src, fig_counter, chap_no):
         n = f"{chap_no}-{fig_counter[0]}"
         return (f'\n<figure><img src="{path}" alt="{html.escape(cap)}" loading="lazy">'
                 f'<figcaption><b>Figure {n}.</b> {cap}</figcaption></figure>\n')
-    src = re.sub(r"^!\[([^\]]*)\]\(([^)]+)\)\s*$", figure, src, flags=re.M)
+    src = re.sub(r"^!\[(.+)\]\(([^)\s]+)\)\s*$", figure, src, flags=re.M)
 
     out = markdown.markdown(src, extensions=["tables", "md_in_html", "attr_list", "sane_lists", "fenced_code"])
 
